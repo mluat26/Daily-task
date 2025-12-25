@@ -31,7 +31,8 @@ import {
   CreditCard,
   FileSpreadsheet,
   RefreshCw,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Copy
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -151,6 +152,27 @@ const INITIAL_PROJECTS: Project[] = [
     type: 'complex'
   }
 ];
+
+const GOOGLE_SCRIPT_CODE = `function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  
+  // Xóa dữ liệu cũ (giữ lại hàng tiêu đề)
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, 6).clearContent();
+  } else {
+    // Tạo tiêu đề nếu chưa có
+    sheet.appendRow(["Ngày tạo", "Công ty", "Dự án", "Budget", "Trạng thái", "Deadline"]);
+  }
+
+  // Thêm dữ liệu mới
+  data.forEach(function(item) {
+    sheet.appendRow([item.date, item.client, item.project, item.budget, item.status, item.deadline]);
+  });
+
+  return ContentService.createTextOutput("Success").setMimeType(ContentService.MimeType.TEXT);
+}`;
 
 const NavItem: React.FC<{
   isDarkMode: boolean;
@@ -623,22 +645,30 @@ const App: React.FC = () => {
               deadline: formatDateDisplay(p.deadline)
           }));
 
+          // CRITICAL FIX: Send as 'text/plain' to avoid CORS preflight (OPTIONS request) 
+          // which Google Apps Script Web App does not support automatically.
+          // The data is still valid JSON string.
           await fetch(sheetWebhookUrl, {
               method: 'POST',
-              mode: 'no-cors', // Google Scripts often require no-cors for simple webhooks
+              mode: 'no-cors', 
               headers: {
-                  'Content-Type': 'application/json',
+                  'Content-Type': 'text/plain',
               },
               body: JSON.stringify(payload)
           });
           
-          alert('Đã gửi dữ liệu Sync thành công! (Lưu ý: Do Google App Script, có thể mất vài giây để sheet cập nhật)');
+          alert('Đã gửi yêu cầu Sync! Vui lòng kiểm tra Google Sheet sau vài giây.');
       } catch (error) {
           console.error("Sync Error", error);
-          alert('Có lỗi khi Sync. Vui lòng kiểm tra lại URL Script.');
+          alert('Có lỗi khi Sync. Vui lòng kiểm tra lại URL hoặc kết nối mạng.');
       } finally {
           setIsSyncing(false);
       }
+  };
+
+  const handleCopyScript = () => {
+      navigator.clipboard.writeText(GOOGLE_SCRIPT_CODE);
+      alert('Đã copy đoạn mã Script! Hãy paste vào Extensions > Apps Script trong Sheet của bạn.');
   };
 
   const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -936,17 +966,38 @@ const App: React.FC = () => {
 
                  {showSheetConfig && (
                      <div className="mt-6 pt-6 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
-                         <div className="space-y-3">
-                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google App Script Web App URL</label>
-                             <input 
-                                value={sheetWebhookUrl}
-                                onChange={(e) => setSheetWebhookUrl(e.target.value)}
-                                placeholder="https://script.google.com/macros/s/..."
-                                className={`w-full px-4 py-3 rounded-xl border-2 outline-none font-medium text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
-                             />
-                             <p className="text-[10px] text-slate-400">
-                                 *Cách tạo: Mở Sheet {'>'} Extensions {'>'} Apps Script. Paste code xử lý `doPost`. Deploy as Web App (Who has access: Anyone). Copy URL dán vào đây.
-                             </p>
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                             <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Google Script URL</label>
+                                    <input 
+                                        value={sheetWebhookUrl}
+                                        onChange={(e) => setSheetWebhookUrl(e.target.value)}
+                                        placeholder="https://script.google.com/macros/s/..."
+                                        className={`w-full px-4 py-3 rounded-xl border-2 outline-none font-medium text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                    />
+                                </div>
+                                <div className="p-4 bg-yellow-50 rounded-xl text-yellow-800 text-xs leading-relaxed border border-yellow-100">
+                                    <strong>Hướng dẫn setup:</strong><br/>
+                                    1. Vào Google Sheet {'->'} Extensions {'->'} Apps Script.<br/>
+                                    2. Xóa hết code cũ, paste code bên phải vào.<br/>
+                                    3. Bấm Deploy {'->'} New deployment {'->'} Select type: Web App.<br/>
+                                    4. Access as: <strong>Anyone</strong> (Quan trọng).<br/>
+                                    5. Copy Web App URL dán vào ô bên trên.
+                                </div>
+                             </div>
+                             
+                             <div className="space-y-2">
+                                 <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Code Apps Script (Copy & Paste)</label>
+                                    <button onClick={handleCopyScript} className="text-xs font-bold text-indigo-500 hover:underline flex items-center gap-1"><Copy size={12}/> Copy Code</button>
+                                 </div>
+                                 <div className={`relative rounded-xl overflow-hidden border ${isDarkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                                     <pre className="p-4 text-[10px] font-mono overflow-x-auto h-48 text-slate-500">
+                                         {GOOGLE_SCRIPT_CODE}
+                                     </pre>
+                                 </div>
+                             </div>
                          </div>
                      </div>
                  )}
