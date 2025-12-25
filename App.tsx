@@ -48,12 +48,18 @@ import {
   ClipboardList,
   ArrowUpDown,
   CheckSquare,
-  Zap, // For Focus Tab
+  Zap, 
   Play,
   Pause,
   Youtube,
   Search,
-  Headphones
+  Headphones,
+  Maximize2,
+  Minimize2,
+  Coffee,
+  Timer,
+  History,
+  Volume2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -397,12 +403,12 @@ const FilterButton: React.FC<{
 }> = ({ isDarkMode, active, onClick, label }) => (
   <button
     onClick={onClick}
-    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+    className={`flex items-center justify-center py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
       active
         ? isDarkMode
           ? 'bg-slate-700 text-white shadow-sm scale-105'
-          : 'bg-white text-slate-900 shadow-sm scale-105'
-        : 'text-slate-400 hover:text-slate-500'
+          : 'bg-white text-indigo-600 shadow-sm scale-105 border border-slate-100'
+        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
     }`}
   >
     {label}
@@ -721,39 +727,102 @@ const ProjectRow: React.FC<{
   );
 };
 
-const FocusMode: React.FC<{ isDarkMode: boolean; projects: Project[] }> = ({ isDarkMode, projects }) => {
+const FocusMode: React.FC<{ isDarkMode: boolean; setIsDarkMode: (val: boolean) => void; projects: Project[] }> = ({ isDarkMode, setIsDarkMode, projects }) => {
+    // Phase: 'setup' | 'active' | 'break'
+    const [phase, setPhase] = useState<'setup' | 'active' | 'break'>('setup');
+    
+    // Setup State
+    const [setupMinutes, setSetupMinutes] = useState(25);
+    const [targetSessions, setTargetSessions] = useState(4);
+    
+    // Timer State
     const [timeLeft, setTimeLeft] = useState(25 * 60);
     const [isActive, setIsActive] = useState(false);
-    const [mode, setMode] = useState<'work' | 'break'>('work');
-    const [selectedTaskId, setSelectedTaskId] = useState('');
+    const [sessionsCompleted, setSessionsCompleted] = useState(0);
+    
+    // Stats (Mock stored in memory for now)
+    const [stats, setStats] = useState(() => {
+        const today = new Date().toDateString();
+        const stored = localStorage.getItem('ff_focus_stats');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.date === today) return parsed;
+        }
+        return { date: today, todayMins: 0, weekMins: 0, monthMins: 0 };
+    });
+
+    // Content State
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [embeddedId, setEmbeddedId] = useState('');
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    // Initial Sound Load
+    useEffect(() => {
+        audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audioRef.current.volume = 0.5;
+    }, []);
+
+    // Timer Logic
     useEffect(() => {
         let interval: NodeJS.Timeout;
         if (isActive && timeLeft > 0) {
             interval = setInterval(() => {
-                setTimeLeft((prev) => prev - 1);
+                setTimeLeft((prev) => {
+                    if (prev === 11 && audioRef.current) { // Trigger sound at 10s remaining (next tick)
+                        audioRef.current.play().catch(e => console.log("Audio play failed", e));
+                    }
+                    return prev - 1;
+                });
             }, 1000);
-        } else if (timeLeft === 0) {
+        } else if (timeLeft === 0 && isActive) {
             setIsActive(false);
-            if (mode === 'work') {
-                setMode('break');
-                setTimeLeft(5 * 60);
-                alert("Hết giờ làm việc! Hãy nghỉ ngơi chút nhé.");
-            } else {
-                setMode('work');
-                setTimeLeft(25 * 60);
-                alert("Hết giờ nghỉ! Quay lại làm việc nào.");
-            }
+            handleSessionComplete();
         }
         return () => clearInterval(interval);
-    }, [isActive, timeLeft, mode]);
+    }, [isActive, timeLeft]);
 
-    const toggleTimer = () => setIsActive(!isActive);
-    const resetTimer = () => {
+    const handleSessionComplete = () => {
+        // Update Stats
+        const addedMins = phase === 'active' ? setupMinutes : 0; // Don't count break time
+        if (addedMins > 0) {
+            const newStats = {
+                ...stats,
+                todayMins: stats.todayMins + addedMins,
+                weekMins: stats.weekMins + addedMins, // Simplified logic
+                monthMins: stats.monthMins + addedMins
+            };
+            setStats(newStats);
+            localStorage.setItem('ff_focus_stats', JSON.stringify(newStats));
+            setSessionsCompleted(prev => prev + 1);
+        }
+
+        // Show Break Popup
+        if (window.confirm("Hết giờ! Bạn có muốn nghỉ ngơi chút không?\n\nOK: Nghỉ 5 phút.\nCancel: Tiếp tục làm việc.")) {
+            startBreak(5);
+        } else {
+            // Reset to active but wait for user start
+            setPhase('active');
+            setTimeLeft(setupMinutes * 60);
+        }
+    };
+
+    const startFocus = () => {
+        setPhase('active');
+        setTimeLeft(setupMinutes * 60);
+        setIsActive(true);
+        setIsDarkMode(true); // Auto Dark Mode
+    };
+
+    const startBreak = (mins: number) => {
+        setPhase('break');
+        setTimeLeft(mins * 60);
+        setIsActive(true);
+    };
+
+    const stopFocus = () => {
         setIsActive(false);
-        setTimeLeft(mode === 'work' ? 25 * 60 : 5 * 60);
+        setPhase('setup');
+        // Optional: setIsDarkMode(false); // Keep dark mode or revert? keeping it for now.
     };
 
     const formatTime = (seconds: number) => {
@@ -771,95 +840,132 @@ const FocusMode: React.FC<{ isDarkMode: boolean; projects: Project[] }> = ({ isD
         }
     };
 
-    const activeTasks = useMemo(() => {
-        const tasks: {id: string, title: string, project: string}[] = [];
-        projects.filter(p => p.status !== ProjectStatus.COMPLETED).forEach(p => {
-            p.tasks.filter(t => !t.completed).forEach(t => {
-                tasks.push({ id: t.id, title: t.title, project: p.projectName });
-            });
-        });
-        return tasks;
-    }, [projects]);
+    if (phase === 'setup') {
+        return (
+            <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className={`p-8 rounded-3xl border shadow-sm text-center relative overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                    <div className="w-16 h-16 bg-violet-100 text-violet-600 rounded-2xl mx-auto flex items-center justify-center mb-6">
+                        <Zap size={32} fill="currentColor"/>
+                    </div>
+                    <h2 className="text-3xl font-black mb-2">Focus Session Setup</h2>
+                    <p className="text-slate-500 text-sm font-medium mb-8">Thiết lập thời gian để tối ưu sự tập trung.</p>
 
-    return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className={`p-8 rounded-3xl border shadow-sm text-center relative overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-fuchsia-500" />
-                
-                <h2 className={`text-6xl md:text-8xl font-black font-mono tracking-tighter mb-8 tabular-nums ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                    {formatTime(timeLeft)}
-                </h2>
+                    <div className="grid grid-cols-2 gap-6 mb-8">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thời gian (Phút)</label>
+                            <div className="flex items-center justify-center gap-4">
+                                <button onClick={() => setSetupMinutes(m => Math.max(5, m - 5))} className="p-2 hover:bg-slate-100 rounded-lg dark:hover:bg-slate-800"><ArrowUpDown size={16} className="rotate-90 text-slate-400"/></button>
+                                <span className="text-4xl font-black font-mono w-20">{setupMinutes}</span>
+                                <button onClick={() => setSetupMinutes(m => Math.min(120, m + 5))} className="p-2 hover:bg-slate-100 rounded-lg dark:hover:bg-slate-800"><ArrowUpDown size={16} className="-rotate-90 text-slate-400"/></button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mục tiêu (Session)</label>
+                            <div className="flex items-center justify-center gap-4">
+                                <button onClick={() => setTargetSessions(s => Math.max(1, s - 1))} className="p-2 hover:bg-slate-100 rounded-lg dark:hover:bg-slate-800"><ArrowUpDown size={16} className="rotate-90 text-slate-400"/></button>
+                                <span className="text-4xl font-black font-mono w-20">{targetSessions}</span>
+                                <button onClick={() => setTargetSessions(s => Math.min(10, s + 1))} className="p-2 hover:bg-slate-100 rounded-lg dark:hover:bg-slate-800"><ArrowUpDown size={16} className="-rotate-90 text-slate-400"/></button>
+                            </div>
+                        </div>
+                    </div>
 
-                <div className="flex justify-center gap-4 mb-8">
                     <button 
-                        onClick={toggleTimer}
-                        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${isActive ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'}`}
+                        onClick={startFocus}
+                        className="w-full py-4 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl shadow-xl shadow-violet-500/20 text-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
                     >
-                        {isActive ? <Pause size={28} fill="currentColor"/> : <Play size={28} fill="currentColor" className="ml-1"/>}
-                    </button>
-                    <button 
-                        onClick={resetTimer}
-                        className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'}`}
-                    >
-                        <RotateCcw size={24} />
+                        <Play fill="currentColor"/> Bắt đầu Focus
                     </button>
                 </div>
 
-                <div className="max-w-md mx-auto relative z-10">
-                    <select 
-                        value={selectedTaskId}
-                        onChange={(e) => setSelectedTaskId(e.target.value)}
-                        className={`w-full px-4 py-3 rounded-xl appearance-none font-bold text-center outline-none border-2 transition-colors cursor-pointer ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-500'}`}
-                    >
-                        <option value="">-- Chọn việc để Focus --</option>
-                        {activeTasks.map(t => (
-                            <option key={t.id} value={t.id}>{t.title} ({t.project})</option>
+                <div className="grid grid-cols-3 gap-4">
+                     <div className={`p-4 rounded-2xl border text-center ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hôm nay</p>
+                         <p className="text-xl font-black text-violet-500">{stats.todayMins}p</p>
+                     </div>
+                     <div className={`p-4 rounded-2xl border text-center ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tuần này</p>
+                         <p className="text-xl font-black text-fuchsia-500">{stats.weekMins}p</p>
+                     </div>
+                     <div className={`p-4 rounded-2xl border text-center ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tháng này</p>
+                         <p className="text-xl font-black text-indigo-500">{stats.monthMins}p</p>
+                     </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Active Phase UI
+    return (
+        <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
+            {/* Top Bar with Mini Timer Card */}
+            <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Youtube size={20}/></div>
+                    <form onSubmit={handleYoutubeEmbed} className="flex gap-2">
+                        <input 
+                            value={youtubeUrl}
+                            onChange={(e) => setYoutubeUrl(e.target.value)}
+                            placeholder="Dán link Youtube..."
+                            className={`w-64 px-3 py-2 rounded-xl outline-none border font-medium text-xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                        />
+                        <button type="submit" className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700"><Search size={16}/></button>
+                    </form>
+                    <div className="flex gap-1">
+                        {['jfKfPfyJRdk', '5qap5aO4i9A', 'DWcJFNfaw9c'].map((id, i) => (
+                             <button key={id} onClick={() => setEmbeddedId(id)} className={`px-3 py-2 rounded-lg text-[10px] font-bold ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-white hover:bg-slate-50'}`}>{['Lofi Girl', 'Lofi Boy', 'Piano'][i]}</button>
                         ))}
-                    </select>
+                    </div>
+                </div>
+
+                {/* Mini Timer Card */}
+                <div className={`p-4 rounded-2xl border shadow-lg flex items-center gap-5 min-w-[280px] backdrop-blur-md transition-colors ${isDarkMode ? 'bg-slate-900/80 border-slate-700' : 'bg-white/80 border-slate-200'}`}>
+                    <div className="text-center">
+                        <div className={`text-3xl font-black font-mono tabular-nums leading-none ${phase === 'break' ? 'text-emerald-500' : 'text-white'}`}>
+                            {formatTime(timeLeft)}
+                        </div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-1 tracking-widest">{phase === 'break' ? 'Nghỉ ngơi' : 'Đang Focus'}</p>
+                    </div>
+                    
+                    <div className="h-8 w-[1px] bg-slate-700 mx-1"></div>
+
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsActive(!isActive)} className={`p-3 rounded-xl transition-all ${isActive ? 'bg-amber-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                            {isActive ? <Pause size={18} fill="currentColor"/> : <Play size={18} fill="currentColor"/>}
+                        </button>
+                        <button onClick={stopFocus} className="p-3 rounded-xl bg-slate-800 text-slate-400 hover:text-red-400 transition-colors">
+                            <X size={18} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className={`p-6 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Youtube size={20}/></div>
-                    <h3 className="font-black text-lg">Focus Sound</h3>
-                </div>
-                
-                <form onSubmit={handleYoutubeEmbed} className="flex gap-2 mb-4">
-                    <input 
-                        value={youtubeUrl}
-                        onChange={(e) => setYoutubeUrl(e.target.value)}
-                        placeholder="Dán link Youtube (Lofi, Piano...)"
-                        className={`flex-1 px-4 py-2 rounded-xl outline-none border font-medium text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                    <button type="submit" className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"><Search size={20}/></button>
-                </form>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                     {['jfKfPfyJRdk', '5qap5aO4i9A', 'DWcJFNfaw9c', 'tVkUTbC8t0E'].map((id, i) => (
-                         <button 
-                            key={id}
-                            onClick={() => setEmbeddedId(id)}
-                            className={`p-2 rounded-lg text-xs font-bold text-center transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'}`}
-                         >
-                             {['Lofi Girl', 'Lofi Boy', 'Piano', 'Jazz'][i]}
-                         </button>
-                     ))}
-                </div>
-
-                {embeddedId && (
-                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-black">
-                        <iframe 
-                            width="100%" 
-                            height="100%" 
-                            src={`https://www.youtube.com/embed/${embeddedId}?autoplay=1`} 
-                            title="YouTube video player" 
-                            frameBorder="0" 
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                            allowFullScreen
-                        ></iframe>
+            {/* Main Youtube Area */}
+            <div className="flex-1 rounded-3xl overflow-hidden border border-slate-800 bg-black relative group shadow-2xl">
+                 {embeddedId ? (
+                    <iframe 
+                        width="100%" 
+                        height="100%" 
+                        src={`https://www.youtube.com/embed/${embeddedId}?autoplay=1`} 
+                        title="YouTube video player" 
+                        frameBorder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowFullScreen
+                        className="absolute inset-0 w-full h-full object-cover"
+                    ></iframe>
+                 ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-700">
+                        <Headphones size={64} className="mb-4 opacity-50"/>
+                        <p className="font-bold text-lg">Chọn nhạc để bắt đầu không gian Focus</p>
                     </div>
-                )}
+                 )}
+                 
+                 {/* Session Progress Overlay */}
+                 <div className="absolute bottom-6 left-6 flex gap-2">
+                     {Array.from({length: targetSessions}).map((_, i) => (
+                         <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < sessionsCompleted ? 'bg-violet-500' : 'bg-slate-800 border border-slate-700'}`} />
+                     ))}
+                 </div>
             </div>
         </div>
     );
@@ -1414,27 +1520,36 @@ const App: React.FC = () => {
         {activeTab === 'projects' && (
           <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                {/* Filter Group - Grid Layout for Full Width/Even Sizing */}
-                <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl w-full md:w-auto ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                {/* Filter Group - Styled Cleaner & Grid Full Width */}
+                <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-xl w-full md:w-auto ${isDarkMode ? 'bg-slate-800' : 'bg-white border border-slate-200 shadow-sm'}`}>
                     <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'all'} onClick={() => setProjectFilter('all')} label="Tất cả" />
                     <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'urgent'} onClick={() => setProjectFilter('urgent')} label="Gấp" />
                     <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Active" />
                     <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'completed'} onClick={() => setProjectFilter('completed')} label="Xong" />
                 </div>
                 
-                {/* Sort Control */}
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                    <ArrowUpDown size={14} className="text-slate-400" />
+                {/* Sort Control - Styled as Custom Dropdown */}
+                <div className="relative group min-w-[180px]">
+                    <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isDarkMode ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-400 group-hover:text-indigo-600'}`}>
+                        <ArrowUpDown size={14} />
+                    </div>
                     <select 
                         value={sortBy} 
                         onChange={(e) => setSortBy(e.target.value as any)}
-                        className={`text-xs font-bold outline-none bg-transparent cursor-pointer ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}
+                        className={`w-full appearance-none pl-9 pr-8 py-2.5 rounded-xl font-bold text-xs outline-none border transition-all cursor-pointer ${
+                            isDarkMode 
+                                ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-slate-600 focus:border-indigo-500' 
+                                : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
+                        }`}
                     >
                         <option value="deadline-asc">Deadline gần nhất</option>
                         <option value="deadline-desc">Deadline xa nhất</option>
                         <option value="budget-desc">Giá trị cao nhất</option>
                         <option value="newest">Mới nhất</option>
                     </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <ChevronDown size={14} />
+                    </div>
                 </div>
             </div>
             
@@ -1737,7 +1852,7 @@ const App: React.FC = () => {
         )}
 
         {/* New Focus Tab Content */}
-        {activeTab === 'focus' && <FocusMode isDarkMode={isDarkMode} projects={projects} />}
+        {activeTab === 'focus' && <FocusMode isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} projects={projects} />}
 
       </main>
 
@@ -1747,19 +1862,19 @@ const App: React.FC = () => {
           <div className={`rounded-3xl w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-slate-900 text-slate-100 border border-slate-800' : 'bg-white text-slate-900'}`}>
             <h2 className="text-2xl font-black mb-6 tracking-tight">Thêm dự án mới</h2>
             
-            {/* Segmentation Button - Fixed: Added grid layout for full fill */}
-            <div className={`grid grid-cols-2 gap-1 p-1 rounded-xl w-full mb-6 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            {/* Segmentation Button - Fixed: Added grid layout for full fill and increased size */}
+            <div className={`grid grid-cols-2 gap-1 p-1.5 rounded-xl w-full mb-6 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <button 
                     type="button" 
                     onClick={() => setProjectType('single')} 
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'single' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                    className={`flex items-center justify-center gap-3 py-3.5 px-4 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'single' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
                 >
                     <FileType size={14}/> Dự án lẻ
                 </button>
                 <button 
                     type="button" 
                     onClick={() => setProjectType('complex')} 
-                    className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'complex' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                    className={`flex items-center justify-center gap-3 py-3.5 px-4 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'complex' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
                 >
                     <Layers size={14}/> Dự án lớn
                 </button>
