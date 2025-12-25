@@ -63,7 +63,11 @@ import {
   CalendarDays,
   Image,
   Lock,
-  CalendarCheck
+  CalendarCheck,
+  GraduationCap, // Icon cho Study Mode
+  BookOpen,      // Icon Môn học
+  NotebookPen,   // Icon Bài tập
+  Library        // Icon Tài liệu
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -818,12 +822,12 @@ const ProjectRow: React.FC<{
             {/* Left: Info */}
             <div className="flex-1 min-w-0 w-full">
                 <div className="flex items-center gap-3 mb-1.5">
-                    {/* Status Dropdown */}
+                    {/* Status Dropdown - FIXED FORMATTING */}
                     <div className="relative group/status">
                         <select 
                             value={project.status}
                             onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })}
-                            className={`appearance-none pl-6 pr-6 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider cursor-pointer outline-none transition-colors border ${getStatusColorClass(project.status)}`}
+                            className={`appearance-none pl-3 pr-8 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer outline-none transition-colors border ${getStatusColorClass(project.status)}`}
                         >
                             <option value={ProjectStatus.PLANNING}>Planning</option>
                             <option value={ProjectStatus.IN_PROGRESS}>In Progress</option>
@@ -831,8 +835,7 @@ const ProjectRow: React.FC<{
                             <option value={ProjectStatus.ON_HOLD}>On Hold</option>
                             <option value={ProjectStatus.COMPLETED}>Completed</option>
                         </select>
-                        <div className={`absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-colors ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500' : 'bg-current opacity-50'}`} />
-                        <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 transition-transform group-hover/status:rotate-180" />
+                        <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 transition-transform group-hover/status:rotate-180" />
                     </div>
 
                     <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 truncate max-w-[100px]">
@@ -1003,7 +1006,8 @@ const App: React.FC = () => {
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // State for Sidebar
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai' | 'focus'>('dashboard');
-  
+  const [appMode, setAppMode] = useState<'work' | 'study'>('work'); // New: Switch between Work/Study Mode
+
   // Sort & Filter State
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'deadline-asc' | 'deadline-desc' | 'budget-desc' | 'newest'>('deadline-asc');
@@ -1534,30 +1538,51 @@ The vibe should be professional yet celebrating a month of hard work. Focus on t
       <aside className={`border-r p-6 flex flex-col gap-6 transition-[width] duration-300 ease-in-out h-full overflow-y-auto flex-shrink-0 ${isSidebarCollapsed ? 'w-[88px]' : 'w-full md:w-64'} ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
         <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isSidebarCollapsed && (
-            <div className="flex items-center gap-2 animate-in fade-in duration-300">
-                <div className={`p-2 rounded-lg shadow-lg text-white ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
-                <CheckSquare size={18} />
+            <button 
+              onClick={() => setAppMode(prev => prev === 'work' ? 'study' : 'work')}
+              className="flex items-center gap-2 animate-in fade-in duration-300 hover:scale-[1.02] transition-transform active:scale-95 text-left w-full group"
+            >
+                <div className={`p-2 rounded-lg shadow-lg text-white transition-colors duration-300 ${appMode === 'work' ? (isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200') : (isDarkMode ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-teal-700 shadow-teal-200')}`}>
+                    {appMode === 'work' ? <CheckSquare size={18} /> : <GraduationCap size={18} />}
                 </div>
-                <h1 className="text-xl font-black tracking-tight italic">Todo Task</h1>
-            </div>
+                <div>
+                    <h1 className="text-xl font-black tracking-tight italic leading-none">{appMode === 'work' ? 'Todo Task' : 'Study Task'}</h1>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-indigo-500 transition-colors">Switch Mode</p>
+                </div>
+            </button>
           )}
           {isSidebarCollapsed && (
-              <div className={`p-2 rounded-lg shadow-lg text-white mb-2 ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
-                  <CheckSquare size={20} />
-              </div>
+              <button 
+                onClick={() => setAppMode(prev => prev === 'work' ? 'study' : 'work')}
+                className={`p-2 rounded-lg shadow-lg text-white mb-2 transition-colors duration-300 ${appMode === 'work' ? (isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200') : (isDarkMode ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-teal-700 shadow-teal-200')}`}
+                title={appMode === 'work' ? "Chuyển sang Study Mode" : "Chuyển sang Work Mode"}
+              >
+                  {appMode === 'work' ? <CheckSquare size={20} /> : <GraduationCap size={20} />}
+              </button>
           )}
         </div>
 
         <nav className="space-y-2 flex-1">
-          {/* Reordered Tabs */}
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Tổng quan" isCollapsed={isSidebarCollapsed} />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án" isCollapsed={isSidebarCollapsed} />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" isCollapsed={isSidebarCollapsed} />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" isCollapsed={isSidebarCollapsed} />
-          
-          <div className={`pt-4 mt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-             <NavItem isDarkMode={isDarkMode} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<Bot size={20}/>} label="Trợ lý AI" isCollapsed={isSidebarCollapsed} />
-          </div>
+          {appMode === 'work' ? (
+              <>
+                <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Tổng quan" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" isCollapsed={isSidebarCollapsed} />
+                
+                <div className={`pt-4 mt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                    <NavItem isDarkMode={isDarkMode} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<Bot size={20}/>} label="Trợ lý AI" isCollapsed={isSidebarCollapsed} />
+                </div>
+              </>
+          ) : (
+              <>
+                {/* Study Mode Navigation Placeholder */}
+                <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Góc học tập" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={false} onClick={() => {}} icon={<BookOpen size={20}/>} label="Môn học" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={false} onClick={() => {}} icon={<NotebookPen size={20}/>} label="Bài tập" isCollapsed={isSidebarCollapsed} />
+                <NavItem isDarkMode={isDarkMode} active={false} onClick={() => {}} icon={<Library size={20}/>} label="Tài liệu" isCollapsed={isSidebarCollapsed} />
+              </>
+          )}
         </nav>
 
         {/* Mini Timer Popup inside Sidebar Area */}
@@ -1600,436 +1625,460 @@ The vibe should be professional yet celebrating a month of hard work. Focus on t
         {activeTab !== 'focus' && (
              <button 
                 onClick={() => setIsAddingProject(true)} 
-                className="fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-bold transition-all duration-300 shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 text-sm"
+                className="fixed top-6 right-6 z-50 flex items-center gap-2 px-6 h-[58px] bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all duration-300 shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 text-sm"
             >
-                <Plus size={20} strokeWidth={2.5} />
-                <span>Dự án mới</span>
+                <Plus size={22} strokeWidth={3} />
+                <span>{appMode === 'work' ? 'Dự án mới' : 'Bài tập mới'}</span>
             </button>
         )}
 
-        {activeTab !== 'focus' && (
-            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
-                <div>
-                    <h2 className="text-2xl font-black tracking-tight">
-                        {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
-                        activeTab === 'projects' ? 'Dự án của bạn' : 
-                        activeTab === 'clients' ? 'Quản lý Công ty' :
-                        activeTab === 'finance' ? 'Quản lý doanh thu' :
-                        'Trợ lý Tài chính'}
-                    </h2>
-                    <p className={`font-bold mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {activeTab === 'dashboard' ? (
-                            <span className="flex items-center gap-2"><CalendarDays size={16}/> {currentDateDisplay}</span>
-                        ) : (
-                            `Bạn có ${stats.activeCount} dự án đang tiến hành.`
-                        )}
-                    </p>
-                </div>
-
-                {activeTab === 'dashboard' && (
-                    // Added margin-right xl:mr-44 to ensure Month Summary doesn't overlap fixed button
-                    <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto xl:mr-44">
-                        {/* Month Summary Button - Clean Modern Logic */}
-                        <div 
-                            className={`group flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-300 ${isMonthEnd ? 'cursor-pointer hover:shadow-lg border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900' : 'cursor-not-allowed opacity-60 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900'}`} 
-                            onClick={handleGenerateMonthSummary}
-                            title={isMonthEnd ? "Tạo báo cáo tháng ngay" : `Còn ${daysToMonthEnd} ngày nữa mới đến cuối tháng`}
-                        >
-                            <div className={`p-2 rounded-xl transition-colors ${isMonthEnd ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`}>
-                                {isMonthEnd ? <Sparkles size={18} strokeWidth={2.5}/> : <Lock size={18}/>}
-                            </div>
-                            <div className="text-right">
-                                <span className={`block text-[10px] font-black uppercase tracking-widest ${isMonthEnd ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>Tổng kết tháng</span>
-                                <span className={`block text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                    {isMonthEnd ? "Sẵn sàng tạo" : `Còn ${daysToMonthEnd} ngày`}
-                                </span>
-                            </div>
+        {appMode === 'work' ? (
+            // Existing WORK MODE content
+            <>
+                {activeTab !== 'focus' && (
+                    <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
+                        <div>
+                            <h2 className="text-2xl font-black tracking-tight">
+                                {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
+                                activeTab === 'projects' ? 'Dự án của bạn' : 
+                                activeTab === 'clients' ? 'Quản lý Công ty' :
+                                activeTab === 'finance' ? 'Quản lý doanh thu' :
+                                'Trợ lý Tài chính'}
+                            </h2>
+                            <p className={`font-bold mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {activeTab === 'dashboard' ? (
+                                    <span className="flex items-center gap-2"><CalendarDays size={16}/> {currentDateDisplay}</span>
+                                ) : (
+                                    `Bạn có ${stats.activeCount} dự án đang tiến hành.`
+                                )}
+                            </p>
                         </div>
-                    </div>
+
+                        {activeTab === 'dashboard' && (
+                            // Added margin-right xl:mr-44 to ensure Month Summary doesn't overlap fixed button
+                            <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto xl:mr-44">
+                                {/* Month Summary Button - Clean Modern Logic */}
+                                <div 
+                                    className={`group flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-300 ${isMonthEnd ? 'cursor-pointer hover:shadow-lg border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900' : 'cursor-not-allowed opacity-60 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900'}`} 
+                                    onClick={handleGenerateMonthSummary}
+                                    title={isMonthEnd ? "Tạo báo cáo tháng ngay" : `Còn ${daysToMonthEnd} ngày nữa mới đến cuối tháng`}
+                                >
+                                    <div className={`p-2 rounded-xl transition-colors ${isMonthEnd ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`}>
+                                        {isMonthEnd ? <Sparkles size={18} strokeWidth={2.5}/> : <Lock size={18}/>}
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`block text-[10px] font-black uppercase tracking-widest ${isMonthEnd ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>Tổng kết tháng</span>
+                                        <span className={`block text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                            {isMonthEnd ? "Sẵn sàng tạo" : `Còn ${daysToMonthEnd} ngày`}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </header>
                 )}
-            </header>
-        )}
 
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <DashboardCard isDarkMode={isDarkMode} label="Thực thu" value={formatVND(stats.totalEarned)} icon={<CheckCircle2 className="text-emerald-500"/>} trend="Tiền về ví" />
-              <DashboardCard isDarkMode={isDarkMode} label="Chưa thu" value={formatVND(stats.pendingInvoices)} icon={<Clock className="text-amber-500"/>} trend="Chờ thanh toán" />
-              <DashboardCard isDarkMode={isDarkMode} label="Hoàn thành" value={`${Math.round(stats.overallProgress)}%`} icon={<Target className="text-indigo-500"/>} trend="Tổng tiến độ" />
-              <DashboardCard isDarkMode={isDarkMode} label="Active" value={stats.activeCount.toString()} icon={<Briefcase className="text-slate-500"/>} trend="Đang làm" />
-            </div>
-            {/* ... rest of dashboard ... */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className={`lg:col-span-2 p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <h3 className="text-lg font-bold mb-6">Ngân sách (Triệu VNĐ)</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#1E293B' : '#F1F5F9'} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} />
-                      <Tooltip 
-                        cursor={{fill: isDarkMode ? '#1E293B' : '#F8FAFC'}} 
-                        contentStyle={{borderRadius: '12px', border: 'none', backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#0F172A', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                        formatter={(val: any) => [`${val}M VNĐ`, 'Budget']}
-                      />
-                      <Bar dataKey="budget" radius={[4, 4, 0, 0]} barSize={40} animationDuration={1000}>
-                        {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.progress === 100 ? '#10B981' : '#6366F1'} />))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div className={`p-6 rounded-2xl border shadow-sm flex flex-col transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Flame size={18} className="text-orange-500" />Việc GẤP</h3>
-                <div className="space-y-3 flex-1 overflow-y-auto">
-                  {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()).slice(0, 5).map(p => (
-                    <div 
-                        key={p.id} 
-                        onClick={() => handleNavigateToProject(p.id)}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:scale-102 hover:shadow-md ${isDarkMode ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/50 border-orange-100'}`}
-                    >
-                      <div><h4 className="font-bold text-xs truncate max-w-[120px]">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {formatDateDisplay(p.deadline)}</p></div>
-                      <ArrowRight size={14} className="text-orange-400" />
+                {/* --- RENDER WORK TABS --- */}
+                {activeTab === 'dashboard' && (
+                  <div className="space-y-8 animate-in fade-in duration-500">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <DashboardCard isDarkMode={isDarkMode} label="Thực thu" value={formatVND(stats.totalEarned)} icon={<CheckCircle2 className="text-emerald-500"/>} trend="Tiền về ví" />
+                      <DashboardCard isDarkMode={isDarkMode} label="Chưa thu" value={formatVND(stats.pendingInvoices)} icon={<Clock className="text-amber-500"/>} trend="Chờ thanh toán" />
+                      <DashboardCard isDarkMode={isDarkMode} label="Hoàn thành" value={`${Math.round(stats.overallProgress)}%`} icon={<Target className="text-indigo-500"/>} trend="Tổng tiến độ" />
+                      <DashboardCard isDarkMode={isDarkMode} label="Active" value={stats.activeCount.toString()} icon={<Briefcase className="text-slate-500"/>} trend="Đang làm" />
                     </div>
-                  ))}
-                  {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).length === 0 && <p className="text-xs text-slate-500 italic text-center py-10">Không có việc gấp nào.</p>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                    {/* ... rest of dashboard ... */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <div className={`lg:col-span-2 p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                        <h3 className="text-lg font-bold mb-6">Ngân sách (Triệu VNĐ)</h3>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#1E293B' : '#F1F5F9'} />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} dy={10} />
+                              <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} />
+                              <Tooltip 
+                                cursor={{fill: isDarkMode ? '#1E293B' : '#F8FAFC'}} 
+                                contentStyle={{borderRadius: '12px', border: 'none', backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#0F172A', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                                formatter={(val: any) => [`${val}M VNĐ`, 'Budget']}
+                              />
+                              <Bar dataKey="budget" radius={[4, 4, 0, 0]} barSize={40} animationDuration={1000}>
+                                {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.progress === 100 ? '#10B981' : '#6366F1'} />))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      <div className={`p-6 rounded-2xl border shadow-sm flex flex-col transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Flame size={18} className="text-orange-500" />Việc GẤP</h3>
+                        <div className="space-y-3 flex-1 overflow-y-auto">
+                          {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()).slice(0, 5).map(p => (
+                            <div 
+                                key={p.id} 
+                                onClick={() => handleNavigateToProject(p.id)}
+                                className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:scale-102 hover:shadow-md ${isDarkMode ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/50 border-orange-100'}`}
+                            >
+                              <div><h4 className="font-bold text-xs truncate max-w-[120px]">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {formatDateDisplay(p.deadline)}</p></div>
+                              <ArrowRight size={14} className="text-orange-400" />
+                            </div>
+                          ))}
+                          {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).length === 0 && <p className="text-xs text-slate-500 italic text-center py-10">Không có việc gấp nào.</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-        {activeTab === 'projects' && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-                {/* Filter Group - Styled Cleaner & Grid Full Width */}
-                <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-xl w-full md:w-auto ${isDarkMode ? 'bg-slate-800' : 'bg-white border border-slate-200 shadow-sm'}`}>
-                    <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'all'} onClick={() => setProjectFilter('all')} label="Tất cả" />
-                    <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'urgent'} onClick={() => setProjectFilter('urgent')} label="Gấp" />
-                    <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Active" />
-                    <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'completed'} onClick={() => setProjectFilter('completed')} label="Xong" />
-                </div>
-                
-                {/* Sort Control - Styled as Custom Dropdown */}
-                <div className="relative group min-w-[180px]">
-                    <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isDarkMode ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-400 group-hover:text-indigo-600'}`}>
-                        <ArrowUpDown size={14} />
+                {activeTab === 'projects' && (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                        {/* Filter Group - Styled Cleaner & Grid Full Width */}
+                        <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-xl w-full md:w-auto ${isDarkMode ? 'bg-slate-800' : 'bg-white border border-slate-200 shadow-sm'}`}>
+                            <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'all'} onClick={() => setProjectFilter('all')} label="Tất cả" />
+                            <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'urgent'} onClick={() => setProjectFilter('urgent')} label="Gấp" />
+                            <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Active" />
+                            <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'completed'} onClick={() => setProjectFilter('completed')} label="Xong" />
+                        </div>
+                        
+                        {/* Sort Control - Styled as Custom Dropdown */}
+                        <div className="relative group min-w-[180px]">
+                            <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors ${isDarkMode ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-400 group-hover:text-indigo-600'}`}>
+                                <ArrowUpDown size={14} />
+                            </div>
+                            <select 
+                                value={sortBy} 
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                                className={`w-full appearance-none pl-9 pr-8 py-2.5 rounded-xl font-bold text-xs outline-none border transition-all cursor-pointer ${
+                                    isDarkMode 
+                                        ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-slate-600 focus:border-indigo-500' 
+                                        : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
+                                }`}
+                            >
+                                <option value="deadline-asc">Deadline gần nhất</option>
+                                <option value="deadline-desc">Deadline xa nhất</option>
+                                <option value="budget-desc">Giá trị cao nhất</option>
+                                <option value="newest">Mới nhất</option>
+                            </select>
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                <ChevronDown size={14} />
+                            </div>
+                        </div>
                     </div>
-                    <select 
-                        value={sortBy} 
-                        onChange={(e) => setSortBy(e.target.value as any)}
-                        className={`w-full appearance-none pl-9 pr-8 py-2.5 rounded-xl font-bold text-xs outline-none border transition-all cursor-pointer ${
-                            isDarkMode 
-                                ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-slate-600 focus:border-indigo-500' 
-                                : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 focus:border-indigo-500 shadow-sm'
-                        }`}
-                    >
-                        <option value="deadline-asc">Deadline gần nhất</option>
-                        <option value="deadline-desc">Deadline xa nhất</option>
-                        <option value="budget-desc">Giá trị cao nhất</option>
-                        <option value="newest">Mới nhất</option>
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                        <ChevronDown size={14} />
-                    </div>
-                </div>
-            </div>
-            
-            {/* New Horizontal List Layout */}
-            <div className="flex flex-col gap-4">
-              {filteredAndSortedProjects.map(project => (
-                <ProjectRow 
-                  key={project.id} 
-                  isDarkMode={isDarkMode}
-                  project={project} 
-                  onDelete={() => setProjects(projects.filter(p => p.id !== project.id))}
-                  onUpdateTask={(tid, updates) => updateTask(project.id, tid, updates)}
-                  onUpdateProject={(updates) => updateProject(project.id, updates)}
-                  onAddTask={(title) => addTaskToProject(project.id, title)}
-                  onPrintInvoice={handlePrintInvoice}
-                  isHighlighted={highlightedProjectId === project.id}
-                />
-              ))}
-              {filteredAndSortedProjects.length === 0 && (
-                  <div className="text-center py-20 text-slate-400 italic text-sm">Chưa có dự án nào.</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ... Rest of tabs (clients, finance, ai) unchanged but need to be included to maintain file integrity ... */}
-        {activeTab === 'clients' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                {/* Add New Client Section */}
-                <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Plus size={18} className="text-indigo-500"/>Thêm công ty mới</h3>
                     
+                    {/* New Horizontal List Layout */}
                     <div className="flex flex-col gap-4">
-                        <div className="w-full space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên công ty</label>
-                            <input 
-                                value={tabClientName}
-                                onChange={(e) => setTabClientName(e.target.value)}
-                                placeholder="Nhập tên..."
-                                className={`w-full px-4 py-3 rounded-xl outline-none border transition-all duration-300 font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
-                            />
-                        </div>
-
-                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
-                            <div className="space-y-1 flex-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Màu đại diện</label>
-                                <div className="flex gap-2 flex-wrap">
-                                    {PASTEL_PALETTE.map((c) => (
-                                        <button 
-                                            key={c.hex} 
-                                            type="button"
-                                            onClick={() => setTabClientColor(c.hex)}
-                                            className={`w-8 h-8 rounded-full border-2 transition-transform duration-300 hover:scale-125 ${tabClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
-                                            style={{backgroundColor: c.hex}}
-                                            title={c.name}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                            <button 
-                                onClick={handleAddClientFromTab}
-                                disabled={!tabClientName.trim()}
-                                className="h-[44px] px-6 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all duration-300 shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 text-sm hover:translate-y-[-2px]"
-                            >
-                                Thêm ngay
-                            </button>
-                        </div>
+                      {filteredAndSortedProjects.map(project => (
+                        <ProjectRow 
+                          key={project.id} 
+                          isDarkMode={isDarkMode}
+                          project={project} 
+                          onDelete={() => setProjects(projects.filter(p => p.id !== project.id))}
+                          onUpdateTask={(tid, updates) => updateTask(project.id, tid, updates)}
+                          onUpdateProject={(updates) => updateProject(project.id, updates)}
+                          onAddTask={(title) => addTaskToProject(project.id, title)}
+                          onPrintInvoice={handlePrintInvoice}
+                          isHighlighted={highlightedProjectId === project.id}
+                        />
+                      ))}
+                      {filteredAndSortedProjects.length === 0 && (
+                          <div className="text-center py-20 text-slate-400 italic text-sm">Chưa có dự án nào.</div>
+                      )}
                     </div>
-                </div>
+                  </div>
+                )}
 
-                {/* Clients List */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {clients.map(client => {
-                        const clientProjects = projects.filter(p => p.clientName === client.name);
-                        const totalRevenue = clientProjects.reduce((sum, p) => sum + p.budget, 0);
-                        const projectCount = clientProjects.length;
-
-                        return (
-                            <div key={client.id} className={`group relative p-5 rounded-2xl border shadow-sm transition-all duration-300 hover:shadow-lg hover:translate-y-[-4px] ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
-                                <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                    <button 
-                                        onClick={() => handleDeleteClient(client.id)}
-                                        className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
-                                    >
-                                        <Trash2 size={14}/>
-                                    </button>
-                                </div>
-                                
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl shadow-inner transition-transform duration-300 group-hover:rotate-6" style={{backgroundColor: client.color}} />
-                                    <div>
-                                        <h4 className="text-base font-black">{client.name}</h4>
-                                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Khách hàng</p>
-                                    </div>
-                                </div>
-                                
-                                <div className={`grid grid-cols-2 gap-3 p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Dự án</p>
-                                        <p className="text-sm font-black">{projectCount}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Doanh thu</p>
-                                        <p className="text-sm font-black text-emerald-500 tracking-tighter truncate">{formatVND(totalRevenue)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'finance' && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-             <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                 <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-3">
-                         <div className="p-2.5 bg-green-100 text-green-600 rounded-lg"><FileSpreadsheet size={18}/></div>
-                         <div>
-                             <h4 className="font-black text-base">Google Sheets Sync</h4>
-                             <p className="text-xs text-slate-400 font-medium">Đồng bộ dữ liệu thanh toán</p>
-                         </div>
-                     </div>
-                     <div className="flex gap-2">
-                        {sheetWebhookUrl ? (
-                            <button 
-                                onClick={handleSyncToSheet} 
-                                disabled={isSyncing}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-xs"
-                            >
-                                {isSyncing ? <RefreshCw className="animate-spin" size={14}/> : <RefreshCw size={14}/>}
-                                {isSyncing ? 'Syncing...' : 'Sync'}
-                            </button>
-                        ) : (
-                            <button 
-                                onClick={() => setShowSheetConfig(!showSheetConfig)} 
-                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200 transition-colors flex items-center gap-2 text-xs"
-                            >
-                                <LinkIcon size={14}/> Link Sheet
-                            </button>
-                        )}
-                        {sheetWebhookUrl && (
-                             <button onClick={() => setShowSheetConfig(!showSheetConfig)} className="p-2 text-slate-400 hover:text-slate-600"><Edit2 size={16}/></button>
-                        )}
-                     </div>
-                 </div>
-
-                 {showSheetConfig && (
-                     <div className="mt-4 pt-4 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
-                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                             <div className="space-y-3">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Google Script URL</label>
+                {activeTab === 'clients' && (
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                        {/* Add New Client Section */}
+                        <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                            <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Plus size={18} className="text-indigo-500"/>Thêm công ty mới</h3>
+                            
+                            <div className="flex flex-col gap-4">
+                                <div className="w-full space-y-1">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên công ty</label>
                                     <input 
-                                        value={sheetWebhookUrl}
-                                        onChange={(e) => setSheetWebhookUrl(e.target.value)}
-                                        placeholder="https://script.google.com/macros/s/..."
-                                        className={`w-full px-3 py-2 rounded-lg border outline-none font-medium text-xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                        value={tabClientName}
+                                        onChange={(e) => setTabClientName(e.target.value)}
+                                        placeholder="Nhập tên..."
+                                        className={`w-full px-4 py-3 rounded-xl outline-none border transition-all duration-300 font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
                                     />
                                 </div>
-                                <div className="p-3 bg-yellow-50 rounded-lg text-yellow-800 text-[10px] leading-relaxed border border-yellow-100">
-                                    <strong>Setup:</strong> Extensions {'>'} Apps Script {'>'} Paste Code {'>'} Deploy Web App (Access: Anyone).
-                                </div>
-                             </div>
-                             
-                             <div className="space-y-1">
-                                 <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Apps Script Code</label>
-                                    <button onClick={handleCopyScript} className="text-[10px] font-bold text-indigo-500 hover:underline flex items-center gap-1"><Copy size={10}/> Copy</button>
-                                 </div>
-                                 <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
-                                     <pre className="p-3 text-[9px] font-mono overflow-x-auto h-24 text-slate-500">
-                                         {GOOGLE_SCRIPT_CODE}
-                                     </pre>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                 )}
-             </div>
 
-            <div className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className={`p-6 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
-                    <div>
-                        <h3 className="text-lg font-black">Thu nhập</h3>
-                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">Dòng tiền</p>
-                    </div>
-                    {/* Finance Status Filter */}
-                    <div className={`flex p-1 rounded-lg ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                        <button onClick={() => setFinanceFilter('all')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'all' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white shadow-sm text-indigo-600') : 'text-slate-400'}`}>All</button>
-                        <button onClick={() => setFinanceFilter('completed')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'completed' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-emerald-500'}`}>Completed (Thu)</button>
-                        <button onClick={() => setFinanceFilter('active')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'active' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-amber-500'}`}>Active (Chờ)</button>
-                    </div>
-                </div>
-                <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                    <tr className={`text-[10px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-                        <th className="px-6 py-4">Công ty</th>
-                        <th className="px-6 py-4">Dự án</th>
-                        <th className="px-6 py-4">Budget</th>
-                        <th className="px-6 py-4 text-center">Status</th>
-                        <th className="px-6 py-4 text-right">Ngày</th>
-                    </tr>
-                    </thead>
-                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
-                    {filteredFinanceProjects.map(p => (
-                        <tr key={p.id} className={`transition-colors duration-200 ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
-                        <td className="px-6 py-4 font-bold text-xs">
-                            <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-sm">{p.projectName}</td>
-                        <td className="px-6 py-4 font-mono font-bold text-sm">{formatVND(p.budget)}</td>
-                        <td className="px-6 py-4 text-center">
-                            <button 
-                            onClick={() => updateProject(p.id, { paymentStatus: p.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} 
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
-                            >
-                            {p.paymentStatus}
-                            </button>
-                        </td>
-                        <td className="px-6 py-4 text-xs text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-                {filteredFinanceProjects.length === 0 && (
-                    <div className="py-12 text-center text-slate-400 text-xs font-medium italic">Không có dữ liệu phù hợp.</div>
-                )}
-                </div>
-            </div>
-          </div>
-        )}
-
-        {/* New AI Tab Content */}
-        {activeTab === 'ai' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                <div className={`p-8 rounded-3xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <div className="max-w-3xl mx-auto text-center space-y-4 mb-8">
-                        <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 animate-bounce">
-                            <Bot size={28}/>
-                        </div>
-                        <h3 className="text-2xl font-black">Trợ lý Tài chính AI</h3>
-                        <p className="text-slate-500 font-medium text-sm">
-                            Phân tích dữ liệu tài chính và đưa ra lời khuyên quản lý dòng tiền.
-                        </p>
-                    </div>
-
-                    <div className="max-w-xl mx-auto space-y-6">
-                        {/* Prompt Selector - Dropdown */}
-                        <div className="space-y-2">
-                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center">Chọn chủ đề phân tích</label>
-                             <div className="relative">
-                                 <select 
-                                    onChange={(e) => setAiPrompt(e.target.value)}
-                                    className={`w-full appearance-none px-4 py-3 rounded-xl text-sm font-bold border-2 outline-none cursor-pointer transition-colors duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:border-indigo-500' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-500'}`}
-                                    defaultValue=""
-                                 >
-                                     <option value="" disabled>-- Chọn gợi ý --</option>
-                                     {AI_SUGGESTIONS.map((s, i) => (
-                                         <option key={i} value={s}>{s}</option>
-                                     ))}
-                                 </select>
-                                 <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"/>
-                             </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung câu hỏi</label>
-                            <div className={`relative rounded-2xl border-2 transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
-                                <textarea 
-                                    value={aiPrompt}
-                                    onChange={(e) => setAiPrompt(e.target.value)}
-                                    placeholder="Hoặc tự nhập câu hỏi của bạn tại đây..."
-                                    className="w-full p-4 bg-transparent outline-none min-h-[100px] font-medium resize-none text-sm"
-                                />
-                                <div className="absolute bottom-3 right-3">
-                                    <MessageSquare size={14} className="text-slate-400"/>
+                                <div className="flex flex-col md:flex-row gap-4 md:items-end">
+                                    <div className="space-y-1 flex-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Màu đại diện</label>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {PASTEL_PALETTE.map((c) => (
+                                                <button 
+                                                    key={c.hex} 
+                                                    type="button"
+                                                    onClick={() => setTabClientColor(c.hex)}
+                                                    className={`w-8 h-8 rounded-full border-2 transition-transform duration-300 hover:scale-125 ${tabClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                                                    style={{backgroundColor: c.hex}}
+                                                    title={c.name}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={handleAddClientFromTab}
+                                        disabled={!tabClientName.trim()}
+                                        className="h-[44px] px-6 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all duration-300 shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 text-sm hover:translate-y-[-2px]"
+                                    >
+                                        Thêm ngay
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
-                        <button 
-                            onClick={handleGenerateAiPrompt}
-                            disabled={!aiPrompt.trim()}
-                            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:translate-y-[-2px] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                        >
-                            <Copy size={16}/>
-                            <span>Copy Prompt & Mở Gemini</span>
-                            <ExternalLink size={14} className="opacity-70"/>
-                        </button>
+                        {/* Clients List */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {clients.map(client => {
+                                const clientProjects = projects.filter(p => p.clientName === client.name);
+                                const totalRevenue = clientProjects.reduce((sum, p) => sum + p.budget, 0);
+                                const projectCount = clientProjects.length;
 
-                        <div className={`p-3 rounded-xl text-[10px] text-center border border-dashed transition-colors ${isDarkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                            Hệ thống sẽ tự động đính kèm dữ liệu: {projects.length} dự án, tổng thu {formatNumber(stats.totalEarned)}đ.
+                                return (
+                                    <div key={client.id} className={`group relative p-5 rounded-2xl border shadow-sm transition-all duration-300 hover:shadow-lg hover:translate-y-[-4px] ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
+                                        <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                            <button 
+                                                onClick={() => handleDeleteClient(client.id)}
+                                                className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                            >
+                                                <Trash2 size={14}/>
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-10 h-10 rounded-xl shadow-inner transition-transform duration-300 group-hover:rotate-6" style={{backgroundColor: client.color}} />
+                                            <div>
+                                                <h4 className="text-base font-black">{client.name}</h4>
+                                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Khách hàng</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className={`grid grid-cols-2 gap-3 p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Dự án</p>
+                                                <p className="text-sm font-black">{projectCount}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Doanh thu</p>
+                                                <p className="text-sm font-black text-emerald-500 tracking-tighter truncate">{formatVND(totalRevenue)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
+                )}
+
+                {activeTab === 'finance' && (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                     <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                         <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-3">
+                                 <div className="p-2.5 bg-green-100 text-green-600 rounded-lg"><FileSpreadsheet size={18}/></div>
+                                 <div>
+                                     <h4 className="font-black text-base">Google Sheets Sync</h4>
+                                     <p className="text-xs text-slate-400 font-medium">Đồng bộ dữ liệu thanh toán</p>
+                                 </div>
+                             </div>
+                             <div className="flex gap-2">
+                                {sheetWebhookUrl ? (
+                                    <button 
+                                        onClick={handleSyncToSheet} 
+                                        disabled={isSyncing}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-xs"
+                                    >
+                                        {isSyncing ? <RefreshCw className="animate-spin" size={14}/> : <RefreshCw size={14}/>}
+                                        {isSyncing ? 'Syncing...' : 'Sync'}
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => setShowSheetConfig(!showSheetConfig)} 
+                                        className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200 transition-colors flex items-center gap-2 text-xs"
+                                    >
+                                        <LinkIcon size={14}/> Link Sheet
+                                    </button>
+                                )}
+                                {sheetWebhookUrl && (
+                                     <button onClick={() => setShowSheetConfig(!showSheetConfig)} className="p-2 text-slate-400 hover:text-slate-600"><Edit2 size={16}/></button>
+                                )}
+                             </div>
+                         </div>
+
+                         {showSheetConfig && (
+                             <div className="mt-4 pt-4 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
+                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                     <div className="space-y-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Google Script URL</label>
+                                            <input 
+                                                value={sheetWebhookUrl}
+                                                onChange={(e) => setSheetWebhookUrl(e.target.value)}
+                                                placeholder="https://script.google.com/macros/s/..."
+                                                className={`w-full px-3 py-2 rounded-lg border outline-none font-medium text-xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                            />
+                                        </div>
+                                        <div className="p-3 bg-yellow-50 rounded-lg text-yellow-800 text-[10px] leading-relaxed border border-yellow-100">
+                                            <strong>Setup:</strong> Extensions {'>'} Apps Script {'>'} Paste Code {'>'} Deploy Web App (Access: Anyone).
+                                        </div>
+                                     </div>
+                                     
+                                     <div className="space-y-1">
+                                         <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Apps Script Code</label>
+                                            <button onClick={handleCopyScript} className="text-[10px] font-bold text-indigo-500 hover:underline flex items-center gap-1"><Copy size={10}/> Copy</button>
+                                         </div>
+                                         <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                                             <pre className="p-3 text-[9px] font-mono overflow-x-auto h-24 text-slate-500">
+                                                 {GOOGLE_SCRIPT_CODE}
+                                             </pre>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+
+                    <div className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                        <div className={`p-6 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
+                            <div>
+                                <h3 className="text-lg font-black">Thu nhập</h3>
+                                <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">Dòng tiền</p>
+                            </div>
+                            {/* Finance Status Filter */}
+                            <div className={`flex p-1 rounded-lg ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                <button onClick={() => setFinanceFilter('all')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'all' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white shadow-sm text-indigo-600') : 'text-slate-400'}`}>All</button>
+                                <button onClick={() => setFinanceFilter('completed')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'completed' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-emerald-500'}`}>Completed (Thu)</button>
+                                <button onClick={() => setFinanceFilter('active')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'active' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-amber-500'}`}>Active (Chờ)</button>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                            <tr className={`text-[10px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
+                                <th className="px-6 py-4">Công ty</th>
+                                <th className="px-6 py-4">Dự án</th>
+                                <th className="px-6 py-4">Budget</th>
+                                <th className="px-6 py-4 text-center">Status</th>
+                                <th className="px-6 py-4 text-right">Ngày</th>
+                            </tr>
+                            </thead>
+                            <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
+                            {filteredFinanceProjects.map(p => (
+                                <tr key={p.id} className={`transition-colors duration-200 ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
+                                <td className="px-6 py-4 font-bold text-xs">
+                                    <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
+                                </td>
+                                <td className="px-6 py-4 font-bold text-sm">{p.projectName}</td>
+                                <td className="px-6 py-4 font-mono font-bold text-sm">{formatVND(p.budget)}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <button 
+                                    onClick={() => updateProject(p.id, { paymentStatus: p.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} 
+                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
+                                    >
+                                    {p.paymentStatus}
+                                    </button>
+                                </td>
+                                <td className="px-6 py-4 text-xs text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+                                </tr>
+                            ))}
+                            </tbody>
+                        </table>
+                        {filteredFinanceProjects.length === 0 && (
+                            <div className="py-12 text-center text-slate-400 text-xs font-medium italic">Không có dữ liệu phù hợp.</div>
+                        )}
+                        </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* New AI Tab Content */}
+                {activeTab === 'ai' && (
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className={`p-8 rounded-3xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                            <div className="max-w-3xl mx-auto text-center space-y-4 mb-8">
+                                <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 animate-bounce">
+                                    <Bot size={28}/>
+                                </div>
+                                <h3 className="text-2xl font-black">Trợ lý Tài chính AI</h3>
+                                <p className="text-slate-500 font-medium text-sm">
+                                    Phân tích dữ liệu tài chính và đưa ra lời khuyên quản lý dòng tiền.
+                                </p>
+                            </div>
+
+                            <div className="max-w-xl mx-auto space-y-6">
+                                {/* Prompt Selector - Dropdown */}
+                                <div className="space-y-2">
+                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center">Chọn chủ đề phân tích</label>
+                                     <div className="relative">
+                                         <select 
+                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                            className={`w-full appearance-none px-4 py-3 rounded-xl text-sm font-bold border-2 outline-none cursor-pointer transition-colors duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:border-indigo-500' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-500'}`}
+                                            defaultValue=""
+                                         >
+                                             <option value="" disabled>-- Chọn gợi ý --</option>
+                                             {AI_SUGGESTIONS.map((s, i) => (
+                                                 <option key={i} value={s}>{s}</option>
+                                             ))}
+                                         </select>
+                                         <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"/>
+                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung câu hỏi</label>
+                                    <div className={`relative rounded-2xl border-2 transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
+                                        <textarea 
+                                            value={aiPrompt}
+                                            onChange={(e) => setAiPrompt(e.target.value)}
+                                            placeholder="Hoặc tự nhập câu hỏi của bạn tại đây..."
+                                            className="w-full p-4 bg-transparent outline-none min-h-[100px] font-medium resize-none text-sm"
+                                        />
+                                        <div className="absolute bottom-3 right-3">
+                                            <MessageSquare size={14} className="text-slate-400"/>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={handleGenerateAiPrompt}
+                                    disabled={!aiPrompt.trim()}
+                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:translate-y-[-2px] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                                >
+                                    <Copy size={16}/>
+                                    <span>Copy Prompt & Mở Gemini</span>
+                                    <ExternalLink size={14} className="opacity-70"/>
+                                </button>
+
+                                <div className={`p-3 rounded-xl text-[10px] text-center border border-dashed transition-colors ${isDarkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                    Hệ thống sẽ tự động đính kèm dữ liệu: {projects.length} dự án, tổng thu {formatNumber(stats.totalEarned)}đ.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </>
+        ) : (
+            // STUDY MODE PLACEHOLDER CONTENT
+            <div className="space-y-8 animate-in fade-in duration-500 flex flex-col items-center justify-center h-[70vh] text-center">
+                <div className={`p-8 rounded-full ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'} mb-6`}>
+                    <GraduationCap size={64} className={isDarkMode ? 'text-emerald-500' : 'text-teal-600'} strokeWidth={1.5} />
+                </div>
+                <h2 className="text-3xl font-black">Góc học tập</h2>
+                <p className="max-w-md text-slate-500 font-medium">
+                    Chế độ dành riêng cho việc học tập. Quản lý môn học, bài tập về nhà và lịch thi cử một cách khoa học.
+                </p>
+                <div className="flex gap-4">
+                    <button className="px-6 py-3 rounded-xl bg-teal-600 text-white font-bold shadow-lg shadow-teal-500/20 hover:scale-105 transition-transform">
+                        Tạo môn học
+                    </button>
+                    <button className={`px-6 py-3 rounded-xl font-bold transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'}`}>
+                        Xem lịch thi
+                    </button>
                 </div>
             </div>
         )}
