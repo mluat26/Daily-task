@@ -35,7 +35,10 @@ import {
   Copy,
   Bot,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  FileText,
+  Printer,
+  Filter
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -112,6 +115,121 @@ const formatDateDisplay = (isoDate: string) => {
   return `${d}/${m}`;
 }
 
+const generateInvoiceHTML = (project: Project) => {
+  const date = new Date().toLocaleDateString('vi-VN');
+  const totalAmount = formatVND(project.budget);
+  
+  return `
+    <html>
+      <head>
+        <title>Invoice - ${project.projectName}</title>
+        <style>
+          body { font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+          .brand h1 { margin: 0; color: #4f46e5; font-size: 28px; }
+          .brand p { margin: 5px 0 0; color: #666; font-size: 14px; }
+          .invoice-title { text-align: right; }
+          .invoice-title h2 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; }
+          .invoice-title p { margin: 5px 0 0; color: #888; }
+          
+          .info-grid { display: flex; justify-content: space-between; margin-bottom: 40px; }
+          .info-col h3 { font-size: 12px; text-transform: uppercase; color: #888; letter-spacing: 1px; margin-bottom: 10px; }
+          .info-col p { margin: 0; font-weight: bold; font-size: 14px; }
+          .info-col .sub { font-weight: normal; font-size: 13px; color: #666; margin-top: 4px; }
+
+          table { w-full; width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          th { text-align: left; padding: 15px 10px; border-bottom: 2px solid #eee; font-size: 12px; text-transform: uppercase; color: #888; }
+          td { padding: 15px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+          .total-row td { border-bottom: none; border-top: 2px solid #333; font-weight: bold; font-size: 16px; padding-top: 20px; }
+          
+          .bank-info { background: #f9fafb; padding: 20px; border-radius: 12px; margin-top: 40px; border: 1px solid #e5e7eb; }
+          .bank-info h3 { margin: 0 0 10px; font-size: 14px; color: #4f46e5; }
+          .bank-info p { margin: 5px 0; font-size: 14px; font-family: monospace; }
+          
+          .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #888; }
+          @media print { .no-print { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="brand">
+            <h1>Nguyen Minh Luat</h1>
+            <p>Freelance Designer & Developer</p>
+          </div>
+          <div class="invoice-title">
+            <h2>Hóa Đơn</h2>
+            <p>#INV-${project.id.toUpperCase().substring(0,6)}</p>
+            <p>Ngày: ${date}</p>
+          </div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-col">
+            <h3>Khách hàng</h3>
+            <p>${project.clientName}</p>
+          </div>
+          <div class="info-col">
+            <h3>Dự án</h3>
+            <p>${project.projectName}</p>
+            <p class="sub">${project.description || ''}</p>
+          </div>
+          <div class="info-col">
+             <h3>Trạng thái</h3>
+             <p style="color: ${project.paymentStatus === 'Paid' ? 'green' : 'orange'}">${project.paymentStatus === 'Paid' ? 'Đã thanh toán' : 'Chờ thanh toán'}</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 5%">#</th>
+              <th style="width: 55%">Hạng mục công việc (Task)</th>
+              <th style="width: 20%">Deadline</th>
+              <th style="width: 20%; text-align: right;">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${project.tasks.length > 0 ? project.tasks.map((t, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${t.title} ${t.completed ? '(Đã xong)' : ''}</td>
+                <td>${formatDateDisplay(t.dueDate)}</td>
+                <td style="text-align: right;">${t.budget ? new Intl.NumberFormat('vi-VN').format(t.budget) : '0'} ₫</td>
+              </tr>
+            `).join('') : `
+              <tr>
+                <td>1</td>
+                <td>Triển khai dự án trọn gói: ${project.projectName}</td>
+                <td>${formatDateDisplay(project.deadline)}</td>
+                <td style="text-align: right;">${totalAmount}</td>
+              </tr>
+            `}
+            <tr class="total-row">
+              <td colspan="3" style="text-align: right;">TỔNG CỘNG</td>
+              <td style="text-align: right; color: #4f46e5;">${totalAmount}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="bank-info">
+          <h3>Thông tin thanh toán</h3>
+          <p>Ngân hàng: <strong>Vietcombank</strong></p>
+          <p>Số tài khoản: <strong>1015530875</strong></p>
+          <p>Chủ tài khoản: <strong>NGUYEN MINH LUAT</strong></p>
+        </div>
+
+        <div class="footer">
+          <p>Cảm ơn quý khách đã tin tưởng hợp tác!</p>
+        </div>
+        
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+    </html>
+  `;
+};
+
 const TASK_COLORS = [
   { name: 'Indigo', value: '#6366f1' },
   { name: 'Rose', value: '#f43f5e' },
@@ -132,6 +250,14 @@ const PASTEL_PALETTE = [
   { hex: '#e2e8f0', name: 'Slate' },  // slate-200
 ];
 
+const AI_SUGGESTIONS = [
+  "Viết email nhắc thanh toán nhẹ nhàng, lịch sự cho khách hàng này.",
+  "Viết email đòi nợ gắt hơn vì đã quá hạn 1 tuần.",
+  "Tóm tắt tiến độ dự án này để báo cáo cho khách hàng.",
+  "Phân tích rủi ro của dự án dựa trên các task chưa hoàn thành.",
+  "Đề xuất lộ trình làm việc cho tuần tới để kịp deadline."
+];
+
 // Changed to empty array to start fresh as requested
 const INITIAL_CLIENTS: Client[] = [];
 
@@ -146,8 +272,8 @@ const INITIAL_PROJECTS: Project[] = [
     deadline: '2024-12-25',
     budget: 15000000,
     tasks: [
-      { id: 't1', title: 'Phác thảo ý tưởng', dueDate: '2024-12-10', completed: true, color: '#6366f1' },
-      { id: 't2', title: 'Hoàn thiện bản vẽ', dueDate: '2024-12-20', completed: false, color: '#f43f5e' }
+      { id: 't1', title: 'Phác thảo ý tưởng', dueDate: '2024-12-10', completed: true, color: '#6366f1', budget: 5000000 },
+      { id: 't2', title: 'Hoàn thiện bản vẽ', dueDate: '2024-12-20', completed: false, color: '#f43f5e', budget: 10000000 }
     ],
     paymentStatus: PaymentStatus.PENDING,
     createdAt: new Date().toISOString(),
@@ -252,6 +378,93 @@ const FilterButton: React.FC<{
   </button>
 );
 
+// New Component: TaskItem for Inline Editing
+const TaskItem: React.FC<{
+  task: Task;
+  isDarkMode: boolean;
+  onUpdate: (updates: Partial<Task>) => void;
+}> = ({ task, isDarkMode, onUpdate }) => {
+  const [dateStr, setDateStr] = useState(formatDateDisplay(task.dueDate));
+  const [budgetStr, setBudgetStr] = useState(formatNumber(task.budget));
+  const [titleStr, setTitleStr] = useState(task.title);
+
+  // Sync props to state
+  useEffect(() => { setDateStr(formatDateDisplay(task.dueDate)); }, [task.dueDate]);
+  useEffect(() => { setBudgetStr(formatNumber(task.budget)); }, [task.budget]);
+  useEffect(() => { setTitleStr(task.title); }, [task.title]);
+
+  const handleDateBlur = () => {
+      const newDate = parseSmartDate(dateStr);
+      if (newDate && newDate !== task.dueDate) {
+          onUpdate({ dueDate: newDate });
+          setDateStr(formatDateDisplay(newDate)); 
+      } else {
+          setDateStr(formatDateDisplay(task.dueDate));
+      }
+  };
+
+  const handleBudgetBlur = () => {
+      const num = parseNumber(budgetStr);
+      if (num !== task.budget) {
+          onUpdate({ budget: num });
+      }
+  };
+
+  const handleTitleBlur = () => {
+      if (titleStr !== task.title) {
+          onUpdate({ title: titleStr });
+      }
+  }
+
+  return (
+    <div className="flex items-start gap-3 group/task">
+         <button
+            onClick={() => onUpdate({ completed: !task.completed })}
+            className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-700 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
+         >
+            {task.completed && <Check size={12} strokeWidth={4} />}
+         </button>
+         <div className="flex-1 min-w-0">
+            <input
+                value={titleStr}
+                onChange={(e) => setTitleStr(e.target.value)}
+                onBlur={handleTitleBlur}
+                className={`text-sm font-medium block w-full bg-transparent outline-none truncate ${task.completed ? 'text-slate-400 line-through' : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}`}
+            />
+            
+            <div className="flex items-center gap-4 mt-1">
+                {/* Date Edit */}
+                <div className="flex items-center gap-1 group/date relative">
+                    <Clock size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
+                    <input
+                        value={dateStr}
+                        onChange={(e) => setDateStr(e.target.value)}
+                        onBlur={handleDateBlur}
+                        placeholder="dd/mm"
+                        className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-14 transition-all ${isDarkMode ? 'text-slate-400 border-slate-600 focus:border-indigo-500' : 'text-slate-400 border-slate-300 focus:border-indigo-500'}`}
+                    />
+                </div>
+
+                {/* Budget Edit */}
+                <div className="flex items-center gap-1 group/budget relative">
+                    <Banknote size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
+                    <input
+                        value={budgetStr}
+                        onChange={(e) => {
+                             const val = e.target.value.replace(/[^0-9]/g, '');
+                             setBudgetStr(formatNumber(val));
+                        }}
+                        onBlur={handleBudgetBlur}
+                        placeholder="Budget..."
+                        className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-20 transition-all ${isDarkMode ? 'text-slate-400 border-slate-600 focus:border-indigo-500' : 'text-slate-400 border-slate-300 focus:border-indigo-500'}`}
+                    />
+                </div>
+            </div>
+         </div>
+    </div>
+  );
+}
+
 const ProjectCard: React.FC<{
   isDarkMode: boolean;
   project: Project;
@@ -259,7 +472,8 @@ const ProjectCard: React.FC<{
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onUpdateProject: (updates: Partial<Project>) => void;
   onAddTask: (title: string) => void;
-}> = ({ isDarkMode, project, onDelete, onUpdateTask, onUpdateProject, onAddTask }) => {
+  onPrintInvoice: (project: Project) => void;
+}> = ({ isDarkMode, project, onDelete, onUpdateTask, onUpdateProject, onAddTask, onPrintInvoice }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [localBudget, setLocalBudget] = useState(formatNumber(project.budget));
@@ -303,6 +517,14 @@ const ProjectCard: React.FC<{
   return (
     <div className={`group relative p-6 rounded-[2.5rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
       <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+         {/* Invoice Button */}
+         <button 
+           onClick={() => onPrintInvoice(project)} 
+           className="p-2 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-500 hover:text-white transition-colors"
+           title="Xuất hóa đơn PDF"
+         >
+           <FileText size={16}/>
+         </button>
          <button onClick={() => onDelete()} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={16}/></button>
       </div>
 
@@ -398,22 +620,12 @@ const ProjectCard: React.FC<{
          {isExpanded && (
             <div className="mt-4 space-y-3 animate-in slide-in-from-top-2">
                {project.tasks.map(task => (
-                  <div key={task.id} className="flex items-start gap-3 group/task">
-                     <button 
-                        onClick={() => onUpdateTask(task.id, { completed: !task.completed })}
-                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-700 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
-                     >
-                        {task.completed && <Check size={12} strokeWidth={4} />}
-                     </button>
-                     <div className="flex-1">
-                        <span className={`text-sm font-medium block transition-all ${task.completed ? 'text-slate-400 line-through' : ''}`}>{task.title}</span>
-                        {task.dueDate && (
-                            <span className={`text-[10px] font-bold flex items-center gap-1 mt-0.5 ${task.completed ? 'text-slate-300' : 'text-slate-400'}`}>
-                                <Clock size={10}/> {formatDateDisplay(task.dueDate)}
-                            </span>
-                        )}
-                     </div>
-                  </div>
+                  <TaskItem 
+                    key={task.id}
+                    task={task}
+                    isDarkMode={isDarkMode}
+                    onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                  />
                ))}
                
                <form onSubmit={handleAddTask} className="flex gap-2 mt-2">
@@ -466,6 +678,7 @@ const App: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
+  const [financeFilter, setFinanceFilter] = useState<'all' | 'paid' | 'pending'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSheetConfig, setShowSheetConfig] = useState(false);
   
@@ -574,6 +787,15 @@ const App: React.FC = () => {
   }, [projects]);
 
   // Handlers
+  const handlePrintInvoice = (project: Project) => {
+    const html = generateInvoiceHTML(project);
+    const printWindow = window.open('', '', 'width=800,height=800');
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  };
+
   const updateProject = (projectId: string, updates: Partial<Project>) => {
     setProjects(projects.map(p => {
         if (p.id === projectId) {
@@ -607,7 +829,8 @@ const App: React.FC = () => {
       title,
       dueDate: new Date().toISOString().split('T')[0],
       completed: false,
-      color: TASK_COLORS[Math.floor(Math.random() * TASK_COLORS.length)].value
+      color: TASK_COLORS[Math.floor(Math.random() * TASK_COLORS.length)].value,
+      budget: 0 // Initialize with 0 budget
     };
     setProjects(projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, newTask] } : p));
   };
@@ -768,6 +991,13 @@ const App: React.FC = () => {
     return true;
   });
 
+  const filteredFinanceProjects = projects.filter(p => {
+    if (financeFilter === 'all') return true;
+    if (financeFilter === 'paid') return p.paymentStatus === PaymentStatus.PAID;
+    if (financeFilter === 'pending') return p.paymentStatus !== PaymentStatus.PAID;
+    return true;
+  });
+
   const selectedClientDisplay = clients.find(c => c.id === selectedClientId);
 
   // CHANGED: Fixed Layout (h-screen + overflow)
@@ -880,6 +1110,7 @@ const App: React.FC = () => {
                   onUpdateTask={(tid, updates) => updateTask(project.id, tid, updates)}
                   onUpdateProject={(updates) => updateProject(project.id, updates)}
                   onAddTask={(title) => addTaskToProject(project.id, title)}
+                  onPrintInvoice={handlePrintInvoice}
                 />
               ))}
             </div>
@@ -1060,11 +1291,16 @@ const App: React.FC = () => {
 
             <div className={`rounded-[2.5rem] border shadow-sm overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                 <div className={`p-10 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
-                <h3 className="text-2xl font-black">Thu nhập</h3>
-                <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đã thực nhận</p>
-                    <p className="text-4xl font-black text-emerald-500 tracking-tighter">{formatVND(stats.totalEarned)}</p>
-                </div>
+                    <div>
+                        <h3 className="text-2xl font-black">Danh sách thu nhập</h3>
+                        <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">Quản lý dòng tiền</p>
+                    </div>
+                    {/* Finance Status Filter */}
+                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                        <button onClick={() => setFinanceFilter('all')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'all' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white shadow-sm text-indigo-600') : 'text-slate-400'}`}>Tất cả</button>
+                        <button onClick={() => setFinanceFilter('paid')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'paid' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-emerald-500'}`}>Đã nhận</button>
+                        <button onClick={() => setFinanceFilter('pending')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'pending' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-amber-500'}`}>Chờ nhận</button>
+                    </div>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left">
@@ -1078,7 +1314,7 @@ const App: React.FC = () => {
                     </tr>
                     </thead>
                     <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
-                    {projects.map(p => (
+                    {filteredFinanceProjects.map(p => (
                         <tr key={p.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
                         <td className="px-10 py-6 font-bold text-sm">
                             <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
@@ -1098,6 +1334,9 @@ const App: React.FC = () => {
                     ))}
                     </tbody>
                 </table>
+                {filteredFinanceProjects.length === 0 && (
+                    <div className="py-12 text-center text-slate-400 text-sm font-medium italic">Không có dữ liệu phù hợp.</div>
+                )}
                 </div>
             </div>
           </div>
@@ -1119,6 +1358,22 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="max-w-2xl mx-auto space-y-6">
+                        {/* Suggestions Chips */}
+                        <div>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Gợi ý nhanh</p>
+                             <div className="flex flex-wrap gap-2 justify-center">
+                                 {AI_SUGGESTIONS.map((suggestion, i) => (
+                                     <button 
+                                        key={i}
+                                        onClick={() => setAiPrompt(suggestion)}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${isDarkMode ? 'border-slate-700 hover:bg-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500 text-slate-600'}`}
+                                     >
+                                        {suggestion}
+                                     </button>
+                                 ))}
+                             </div>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bạn muốn hỏi gì?</label>
                             <div className={`relative rounded-2xl border-2 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus-within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
