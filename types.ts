@@ -22,9 +22,16 @@ export interface Task {
   budget?: number; // Added budget specific to task
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  color: string; // Hex code or tailwind class
+}
+
 export interface Project {
   id: string;
   clientName: string;
+  clientColor?: string; // Store the color associated with the client
   projectName: string;
   description: string;
   status: ProjectStatus;

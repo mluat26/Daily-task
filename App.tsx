@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -24,7 +24,9 @@ import {
   Coins,
   Sparkles,
   Layers,
-  FileType
+  FileType,
+  Building2,
+  Check
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -36,7 +38,7 @@ import {
   ResponsiveContainer, 
   Cell
 } from 'recharts';
-import { Project, ProjectStatus, PaymentStatus, Task } from './types';
+import { Project, ProjectStatus, PaymentStatus, Task, Client } from './types';
 
 const formatVND = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -45,17 +47,14 @@ const formatVND = (amount: number) => {
 // Hàm xử lý ngày thông minh
 const parseSmartDate = (input: string): string => {
   if (!input) return "";
-  
-  // Nếu input đã là định dạng YYYY-MM-DD
   if (input.match(/^\d{4}-\d{2}-\d{2}$/)) return input;
 
-  const cleanInput = input.replace(/\D/g, '/'); // Thay ký tự đặc biệt bằng /
+  const cleanInput = input.replace(/\D/g, '/');
   const parts = cleanInput.split('/').filter(Boolean);
   const currentYear = new Date().getFullYear();
 
   let day, month, year = currentYear;
 
-  // Trường hợp nhập dính liền: 134 -> 13/04, 1304 -> 13/04
   if (parts.length === 1) {
     const text = parts[0];
     if (text.length === 3) {
@@ -64,7 +63,7 @@ const parseSmartDate = (input: string): string => {
     } else if (text.length === 4) {
       day = parseInt(text.substring(0, 2));
       month = parseInt(text.substring(2, 4));
-    } else if (text.length >= 6) { // 130424
+    } else if (text.length >= 6) { 
       day = parseInt(text.substring(0, 2));
       month = parseInt(text.substring(2, 4));
       const yearStr = text.substring(4);
@@ -73,7 +72,6 @@ const parseSmartDate = (input: string): string => {
         return input; 
     }
   } else {
-    // Trường hợp có dấu cách: 13/4, 13 4
     day = parseInt(parts[0]);
     month = parseInt(parts[1] || new Date().getMonth() + 1 + "");
     if (parts[2]) {
@@ -81,7 +79,6 @@ const parseSmartDate = (input: string): string => {
     }
   }
 
-  // Validate
   if (day > 31 || day < 1 || month > 12 || month < 1) return input;
 
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -102,10 +99,27 @@ const TASK_COLORS = [
   { name: 'Violet', value: '#8b5cf6' },
 ];
 
+const PASTEL_PALETTE = [
+  { hex: '#bfdbfe', name: 'Blue' },   // blue-200
+  { hex: '#bbf7d0', name: 'Green' },  // green-200
+  { hex: '#e9d5ff', name: 'Purple' }, // purple-200
+  { hex: '#fbcfe8', name: 'Pink' },   // pink-200
+  { hex: '#fed7aa', name: 'Orange' }, // orange-200
+  { hex: '#fef08a', name: 'Yellow' }, // yellow-200
+  { hex: '#99f6e4', name: 'Teal' },   // teal-200
+  { hex: '#e2e8f0', name: 'Slate' },  // slate-200
+];
+
+const INITIAL_CLIENTS: Client[] = [
+    { id: 'c1', name: 'Agency X', color: '#bfdbfe' },
+    { id: 'c2', name: 'Tech Corp', color: '#bbf7d0' }
+];
+
 const INITIAL_PROJECTS: Project[] = [
   {
     id: '1',
     clientName: 'Công ty ABC',
+    clientColor: '#fed7aa',
     projectName: 'Thiết kế Key Visual Tết',
     description: 'Thiết kế bộ nhận diện cho chiến dịch Tết 2025.',
     status: ProjectStatus.IN_PROGRESS,
@@ -123,6 +137,7 @@ const INITIAL_PROJECTS: Project[] = [
 ];
 
 const App: React.FC = () => {
+  // Data State
   const [projects, setProjects] = useState<Project[]>(() => {
     try {
         const saved = localStorage.getItem('ff_projects_v9');
@@ -131,6 +146,17 @@ const App: React.FC = () => {
         return INITIAL_PROJECTS;
     }
   });
+  
+  const [clients, setClients] = useState<Client[]>(() => {
+      try {
+          const saved = localStorage.getItem('ff_clients_v1');
+          return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+      } catch (e) {
+          return INITIAL_CLIENTS;
+      }
+  });
+
+  // UI State
   const [isDarkMode, setIsDarkMode] = useState(() => {
       try {
           return localStorage.getItem('ff_theme') === 'dark';
@@ -141,17 +167,30 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
   
-  // Create Project States
+  // Creation Modal State
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [projectType, setProjectType] = useState<'single' | 'complex'>('single');
   const [formDeadline, setFormDeadline] = useState('');
   const [tempTasks, setTempTasks] = useState<Task[]>([]);
   const [smartInput, setSmartInput] = useState('');
   const [complexBudget, setComplexBudget] = useState<number>(0);
+  
+  // Client Selector State
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [isAddingNewClient, setIsAddingNewClient] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientColor, setNewClientColor] = useState(PASTEL_PALETTE[0].hex);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Persistence
   useEffect(() => {
     localStorage.setItem('ff_projects_v9', JSON.stringify(projects));
   }, [projects]);
+  
+  useEffect(() => {
+    localStorage.setItem('ff_clients_v1', JSON.stringify(clients));
+  }, [clients]);
 
   useEffect(() => {
     localStorage.setItem('ff_theme', isDarkMode ? 'dark' : 'light');
@@ -159,7 +198,19 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  // Reset modal state when opening
+  // Click outside to close client dropdown
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+              setIsClientDropdownOpen(false);
+              setIsAddingNewClient(false);
+          }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset modal state
   useEffect(() => {
     if (isAddingProject) {
         setProjectType('single');
@@ -167,21 +218,18 @@ const App: React.FC = () => {
         setFormDeadline('');
         setSmartInput('');
         setComplexBudget(0);
+        setSelectedClientId(null);
+        setIsClientDropdownOpen(false);
+        setIsAddingNewClient(false);
     }
   }, [isAddingProject]);
 
-  // Auto-calculate budget and deadline for Complex Projects
+  // Auto-calc logic
   useEffect(() => {
     if (projectType === 'complex' && tempTasks.length > 0) {
-        // Auto Budget: Sum of tasks
         const totalTaskBudget = tempTasks.reduce((acc, t) => acc + (t.budget || 0), 0);
         setComplexBudget(totalTaskBudget);
-
-        // Auto Deadline: Max date
-        const validDates = tempTasks
-            .map(t => new Date(t.dueDate).getTime())
-            .filter(d => !isNaN(d));
-        
+        const validDates = tempTasks.map(t => new Date(t.dueDate).getTime()).filter(d => !isNaN(d));
         if (validDates.length > 0) {
             const maxDate = new Date(Math.max(...validDates));
             setFormDeadline(maxDate.toISOString().split('T')[0]);
@@ -210,6 +258,7 @@ const App: React.FC = () => {
     });
   }, [projects]);
 
+  // Handlers
   const updateProject = (projectId: string, updates: Partial<Project>) => {
     setProjects(projects.map(p => p.id === projectId ? { ...p, ...updates } : p));
   };
@@ -241,34 +290,48 @@ const App: React.FC = () => {
   const handleSmartInputAdd = (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && smartInput.trim()) {
           e.preventDefault();
-          
-          // Regex to split "Title - Date"
-          // Looks for the last hyphen surrounded by spaces, or just a hyphen if users are lazy
           let title = smartInput;
           let dateStr = "";
-          let budget = 0;
-
-          // Check for hyphen to split Title and Date
           const lastHyphen = smartInput.lastIndexOf('-');
-          
           if (lastHyphen !== -1) {
              title = smartInput.substring(0, lastHyphen).trim();
              dateStr = smartInput.substring(lastHyphen + 1).trim();
           }
-
           const parsedDate = parseSmartDate(dateStr) || new Date().toISOString().split('T')[0];
-
           const newTask: Task = {
               id: Math.random().toString(36).substr(2, 9),
               title: title,
               dueDate: parsedDate,
               completed: false,
               color: TASK_COLORS[tempTasks.length % TASK_COLORS.length].value,
-              budget: budget
+              budget: 0
           };
-
           setTempTasks([...tempTasks, newTask]);
           setSmartInput('');
+      }
+  };
+
+  const handleAddNewClient = () => {
+      if (!newClientName.trim()) return;
+      const newClient: Client = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newClientName,
+          color: newClientColor
+      };
+      setClients([...clients, newClient]);
+      setSelectedClientId(newClient.id);
+      setIsAddingNewClient(false);
+      setNewClientName('');
+      setIsClientDropdownOpen(false);
+  };
+
+  const handleDeleteClient = (e: React.MouseEvent, clientId: string) => {
+      e.stopPropagation();
+      if (window.confirm('Bạn có chắc muốn xóa công ty này không?')) {
+          setClients(clients.filter(c => c.id !== clientId));
+          if (selectedClientId === clientId) {
+              setSelectedClientId(null);
+          }
       }
   };
 
@@ -276,18 +339,24 @@ const App: React.FC = () => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    // Client Validation
+    if (!selectedClientId) {
+        alert("Vui lòng chọn khách hàng/công ty!");
+        return;
+    }
+    const selectedClient = clients.find(c => c.id === selectedClientId);
+
     let deadline = formDeadline;
-    // Fallback if empty in Single mode
     if (projectType === 'single' && !deadline) {
         let rawDeadline = formData.get('deadline') as string;
         deadline = parseSmartDate(rawDeadline) || new Date().toISOString().split('T')[0];
     }
-
     const budget = projectType === 'complex' ? complexBudget : Number(formData.get('budget'));
 
     const newProject: Project = {
       id: Math.random().toString(36).substr(2, 9),
-      clientName: formData.get('clientName') as string,
+      clientName: selectedClient?.name || 'Unknown',
+      clientColor: selectedClient?.color,
       projectName: formData.get('projectName') as string,
       description: (formData.get('description') as string) || '',
       status: ProjectStatus.PLANNING,
@@ -311,6 +380,8 @@ const App: React.FC = () => {
     if (projectFilter === 'completed') return p.status === ProjectStatus.COMPLETED;
     return true;
   });
+
+  const selectedClientDisplay = clients.find(c => c.id === selectedClientId);
 
   return (
     <div className={`flex flex-col md:flex-row min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
@@ -429,6 +500,7 @@ const App: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className={`text-[11px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
+                    <th className="px-10 py-6">Công ty</th>
                     <th className="px-10 py-6">Dự án</th>
                     <th className="px-10 py-6">Budget</th>
                     <th className="px-10 py-6 text-center">Trạng thái</th>
@@ -438,6 +510,9 @@ const App: React.FC = () => {
                 <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
                   {projects.map(p => (
                     <tr key={p.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
+                      <td className="px-10 py-6 font-bold text-sm">
+                          <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
+                      </td>
                       <td className="px-10 py-6 font-bold">{p.projectName}</td>
                       <td className="px-10 py-6 font-mono font-bold">{formatVND(p.budget)}</td>
                       <td className="px-10 py-6 text-center">
@@ -485,7 +560,108 @@ const App: React.FC = () => {
             <form onSubmit={handleCreateProject} className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên dự án</label><input required name="projectName" type="text" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="VD: Landing Page..." /></div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Khách hàng</label><input required name="clientName" type="text" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="VD: Agency X" /></div>
+                
+                {/* Custom Client Selector with Color */}
+                <div className="space-y-2 relative" ref={clientDropdownRef}>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Khách hàng / Công ty</label>
+                    
+                    <div 
+                        onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                        className={`w-full px-6 py-4 rounded-2xl border-2 transition-all font-bold flex items-center justify-between cursor-pointer ${isDarkMode ? 'bg-slate-800 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-50 hover:border-indigo-500'}`}
+                    >
+                        {selectedClientDisplay ? (
+                            <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full" style={{backgroundColor: selectedClientDisplay.color}} />
+                                <span>{selectedClientDisplay.name}</span>
+                            </div>
+                        ) : (
+                            <span className="text-slate-400 font-normal">Chọn khách hàng...</span>
+                        )}
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {/* Dropdown Menu */}
+                    {isClientDropdownOpen && (
+                        <div className={`absolute top-[110%] left-0 right-0 rounded-2xl shadow-xl border z-20 overflow-hidden animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                            {!isAddingNewClient ? (
+                                <>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        {clients.map(client => (
+                                            <div 
+                                                key={client.id}
+                                                className={`group flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
+                                                onClick={() => { setSelectedClientId(client.id); setIsClientDropdownOpen(false); }}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: client.color}} />
+                                                    <span className="font-bold text-sm">{client.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {selectedClientId === client.id && <Check size={14} className="text-indigo-500"/>}
+                                                    <button 
+                                                        type="button"
+                                                        onClick={(e) => handleDeleteClient(e, client.id)}
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                                                        title="Xóa công ty"
+                                                    >
+                                                        <Trash2 size={14}/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className={`p-2 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setIsAddingNewClient(true)}
+                                            className="w-full py-2.5 rounded-xl text-xs font-black text-indigo-500 uppercase tracking-widest hover:bg-indigo-500/10 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={14}/> Thêm công ty mới
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                // Add New Client Mode
+                                <div className="p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase text-slate-400">Công ty mới</span>
+                                        <button type="button" onClick={() => setIsAddingNewClient(false)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
+                                    </div>
+                                    <input 
+                                        autoFocus
+                                        value={newClientName}
+                                        onChange={(e) => setNewClientName(e.target.value)}
+                                        placeholder="Tên công ty..."
+                                        className={`w-full px-3 py-2 rounded-xl text-sm font-bold border-2 outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                    />
+                                    <div>
+                                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-2">Chọn màu Pastel</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {PASTEL_PALETTE.map((c) => (
+                                                <button 
+                                                    key={c.hex} 
+                                                    type="button"
+                                                    onClick={() => setNewClientColor(c.hex)}
+                                                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${newClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                                                    style={{backgroundColor: c.hex}}
+                                                    title={c.name}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        onClick={handleAddNewClient}
+                                        disabled={!newClientName.trim()}
+                                        className="w-full py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        Lưu & Chọn
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
               </div>
               
               <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả dự án</label><textarea name="description" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-medium h-24 ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="Chi tiết..." /></div>
@@ -628,7 +804,6 @@ const ProjectCard: React.FC<{
     }
   };
 
-  // Smart Date input handler for task editing
   const handleTaskDateBlur = (tid: string, value: string) => {
       const parsed = parseSmartDate(value);
       if(parsed) onUpdateTask(tid, { dueDate: parsed });
@@ -646,7 +821,19 @@ const ProjectCard: React.FC<{
             </select>
             {project.type === 'complex' && <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-full dark:bg-slate-800">DỰ ÁN LỚN</span>}
           </div>
-          <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-500 transition-colors">{project.projectName}</h3><p className="text-sm font-bold text-slate-500 mt-1">{project.clientName}</p>
+          <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-500 transition-colors">{project.projectName}</h3>
+          
+          {/* Client Badge with Pastel Color */}
+          <div className="mt-2 flex items-center gap-2">
+              <span 
+                className="px-3 py-1 rounded-lg text-xs font-bold text-slate-800 flex items-center gap-1.5 shadow-sm"
+                style={{backgroundColor: project.clientColor || '#e2e8f0'}}
+              >
+                  <Building2 size={12} className="opacity-50"/>
+                  {project.clientName}
+              </span>
+          </div>
+
         </div>
         <div className="flex gap-1">
           <button onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })} className={`p-2.5 rounded-xl transition-colors ${project.isUrgent ? 'text-orange-500 bg-orange-500/10' : 'text-slate-500 hover:bg-slate-800'}`}><Flame size={20} /></button>
