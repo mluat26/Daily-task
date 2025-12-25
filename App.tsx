@@ -26,7 +26,8 @@ import {
   Layers,
   FileType,
   Building2,
-  Check
+  Check,
+  TrendingUp
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -39,6 +40,19 @@ import {
   Cell
 } from 'recharts';
 import { Project, ProjectStatus, PaymentStatus, Task, Client } from './types';
+
+// Hàm helper format số: 1000000 -> 1.000.000
+const formatNumber = (num: number | string | undefined): string => {
+  if (num === undefined || num === null || num === '') return '';
+  const str = num.toString().replace(/\./g, '');
+  return str.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
+// Hàm helper parse số: 1.000.000 -> 1000000
+const parseNumber = (str: string): number => {
+  if (!str) return 0;
+  return Number(str.replace(/\./g, ''));
+};
 
 const formatVND = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -110,15 +124,13 @@ const PASTEL_PALETTE = [
   { hex: '#e2e8f0', name: 'Slate' },  // slate-200
 ];
 
-const INITIAL_CLIENTS: Client[] = [
-    { id: 'c1', name: 'Agency X', color: '#bfdbfe' },
-    { id: 'c2', name: 'Tech Corp', color: '#bbf7d0' }
-];
+// Changed to empty array to start fresh as requested
+const INITIAL_CLIENTS: Client[] = [];
 
 const INITIAL_PROJECTS: Project[] = [
   {
     id: '1',
-    clientName: 'Công ty ABC',
+    clientName: 'Công ty Mẫu',
     clientColor: '#fed7aa',
     projectName: 'Thiết kế Key Visual Tết',
     description: 'Thiết kế bộ nhận diện cho chiến dịch Tết 2025.',
@@ -135,6 +147,183 @@ const INITIAL_PROJECTS: Project[] = [
     type: 'complex'
   }
 ];
+
+const NavItem: React.FC<{
+  isDarkMode: boolean;
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}> = ({ isDarkMode, active, onClick, icon, label }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-medium ${
+      active
+        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+        : isDarkMode
+        ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+    }`}
+  >
+    {icon}
+    <span>{label}</span>
+  </button>
+);
+
+const DashboardCard: React.FC<{
+  isDarkMode: boolean;
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  trend: string;
+}> = ({ isDarkMode, label, value, icon, trend }) => (
+  <div
+    className={`p-6 rounded-[2rem] border shadow-sm transition-colors ${
+      isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+    }`}
+  >
+    <div className="flex items-start justify-between mb-4">
+      <div
+        className={`p-3 rounded-2xl ${
+          isDarkMode ? 'bg-slate-800' : 'bg-slate-50'
+        }`}
+      >
+        {icon}
+      </div>
+      <span
+        className={`text-xs font-bold px-2 py-1 rounded-lg ${
+          isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+        }`}
+      >
+        {trend}
+      </span>
+    </div>
+    <p className="text-slate-400 text-sm font-medium mb-1">{label}</p>
+    <h3 className="text-2xl font-black tracking-tight">{value}</h3>
+  </div>
+);
+
+const FilterButton: React.FC<{
+  isDarkMode: boolean;
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}> = ({ isDarkMode, active, onClick, label }) => (
+  <button
+    onClick={onClick}
+    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+      active
+        ? isDarkMode
+          ? 'bg-slate-700 text-white shadow-sm'
+          : 'bg-white text-slate-900 shadow-sm'
+        : 'text-slate-400 hover:text-slate-500'
+    }`}
+  >
+    {label}
+  </button>
+);
+
+const ProjectCard: React.FC<{
+  isDarkMode: boolean;
+  project: Project;
+  onDelete: () => void;
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  onUpdateProject: (updates: Partial<Project>) => void;
+  onAddTask: (title: string) => void;
+}> = ({ isDarkMode, project, onDelete, onUpdateTask, onUpdateProject, onAddTask }) => {
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const completedTasks = project.tasks.filter(t => t.completed).length;
+  const totalTasks = project.tasks.length;
+  const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTaskTitle.trim()) {
+      onAddTask(newTaskTitle);
+      setNewTaskTitle('');
+    }
+  };
+
+  return (
+    <div className={`group relative p-6 rounded-[2.5rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
+      <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+         <button onClick={() => onDelete()} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={16}/></button>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+           <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.isUrgent ? 'bg-orange-500 text-white' : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
+             {project.isUrgent ? 'Urgent' : 'Normal'}
+           </span>
+           <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-500" style={{backgroundColor: project.clientColor ? `${project.clientColor}20` : undefined, color: project.clientColor}}>
+             {project.clientName}
+           </span>
+        </div>
+        <h3 className="text-xl font-black mb-1 line-clamp-1" title={project.projectName}>{project.projectName}</h3>
+        <p className="text-sm text-slate-400 font-medium line-clamp-2 h-10">{project.description || 'Không có mô tả'}</p>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <div className="flex items-center justify-between text-xs font-bold text-slate-400">
+           <span className="flex items-center gap-1"><Calendar size={14}/> {formatDateDisplay(project.deadline)}</span>
+           <span className="flex items-center gap-1"><Banknote size={14}/> {formatVND(project.budget)}</span>
+        </div>
+        
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs font-black">
+             <span>Tiến độ</span>
+             <span>{progress}%</span>
+          </div>
+          <div className={`h-2.5 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+             <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+         <button onClick={() => setIsExpanded(!isExpanded)} className="flex items-center justify-between w-full text-sm font-bold hover:text-indigo-500 transition-colors">
+            <span>Danh sách việc ({completedTasks}/{totalTasks})</span>
+            {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+         </button>
+         
+         {isExpanded && (
+            <div className="mt-4 space-y-3 animate-in slide-in-from-top-2">
+               {project.tasks.map(task => (
+                  <div key={task.id} className="flex items-start gap-3 group/task">
+                     <button 
+                        onClick={() => onUpdateTask(task.id, { completed: !task.completed })}
+                        className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-700 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
+                     >
+                        {task.completed && <Check size={12} strokeWidth={4} />}
+                     </button>
+                     <div className="flex-1">
+                        <span className={`text-sm font-medium block transition-all ${task.completed ? 'text-slate-400 line-through' : ''}`}>{task.title}</span>
+                        {task.dueDate && (
+                            <span className={`text-[10px] font-bold flex items-center gap-1 mt-0.5 ${task.completed ? 'text-slate-300' : 'text-slate-400'}`}>
+                                <Clock size={10}/> {formatDateDisplay(task.dueDate)}
+                            </span>
+                        )}
+                     </div>
+                  </div>
+               ))}
+               
+               <form onSubmit={handleAddTask} className="flex gap-2 mt-2">
+                  <input 
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    placeholder="Thêm việc..."
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:border-indigo-500' : 'bg-slate-50 border-slate-100 focus:border-indigo-500'}`}
+                  />
+                  <button type="submit" disabled={!newTaskTitle.trim()} className="p-2 bg-indigo-600 text-white rounded-xl disabled:opacity-50"><Plus size={16}/></button>
+               </form>
+            </div>
+         )}
+      </div>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   // Data State
@@ -164,7 +353,7 @@ const App: React.FC = () => {
           return false;
       }
   });
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
   
   // Creation Modal State
@@ -174,6 +363,7 @@ const App: React.FC = () => {
   const [tempTasks, setTempTasks] = useState<Task[]>([]);
   const [smartInput, setSmartInput] = useState('');
   const [complexBudget, setComplexBudget] = useState<number>(0);
+  const [formBudgetDisplay, setFormBudgetDisplay] = useState(''); // State riêng để hiển thị budget có dấu chấm
   
   // Client Selector State
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -182,6 +372,10 @@ const App: React.FC = () => {
   const [newClientName, setNewClientName] = useState('');
   const [newClientColor, setNewClientColor] = useState(PASTEL_PALETTE[0].hex);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Tab Clients Management State
+  const [tabClientName, setTabClientName] = useState('');
+  const [tabClientColor, setTabClientColor] = useState(PASTEL_PALETTE[0].hex);
 
   // Persistence
   useEffect(() => {
@@ -218,6 +412,7 @@ const App: React.FC = () => {
         setFormDeadline('');
         setSmartInput('');
         setComplexBudget(0);
+        setFormBudgetDisplay('');
         setSelectedClientId(null);
         setIsClientDropdownOpen(false);
         setIsAddingNewClient(false);
@@ -325,13 +520,20 @@ const App: React.FC = () => {
       setIsClientDropdownOpen(false);
   };
 
-  const handleDeleteClient = (e: React.MouseEvent, clientId: string) => {
-      e.stopPropagation();
-      if (window.confirm('Bạn có chắc muốn xóa công ty này không?')) {
-          setClients(clients.filter(c => c.id !== clientId));
-          if (selectedClientId === clientId) {
-              setSelectedClientId(null);
-          }
+  const handleAddClientFromTab = () => {
+      if (!tabClientName.trim()) return;
+      const newClient: Client = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: tabClientName,
+          color: tabClientColor
+      };
+      setClients([...clients, newClient]);
+      setTabClientName('');
+  }
+
+  const handleDeleteClient = (clientId: string) => {
+      if (window.confirm('Bạn có chắc muốn xóa công ty này khỏi danh sách? (Dự án cũ vẫn giữ nguyên)')) {
+          setClients(prev => prev.filter(c => c.id !== clientId));
       }
   };
 
@@ -351,7 +553,9 @@ const App: React.FC = () => {
         let rawDeadline = formData.get('deadline') as string;
         deadline = parseSmartDate(rawDeadline) || new Date().toISOString().split('T')[0];
     }
-    const budget = projectType === 'complex' ? complexBudget : Number(formData.get('budget'));
+    
+    // Lấy budget từ form hoặc complex calc
+    const budget = projectType === 'complex' ? complexBudget : parseNumber(formData.get('budget') as string);
 
     const newProject: Project = {
       id: Math.random().toString(36).substr(2, 9),
@@ -402,6 +606,7 @@ const App: React.FC = () => {
         <nav className="space-y-1">
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Tổng quan" />
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án & Task" />
+          <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" />
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" />
         </nav>
       </aside>
@@ -410,7 +615,12 @@ const App: React.FC = () => {
       <main className="flex-1 p-6 md:p-10 overflow-y-auto max-w-6xl mx-auto w-full">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
           <div>
-            <h2 className="text-3xl font-black tracking-tight">{activeTab === 'dashboard' ? 'Chào ngày mới!' : activeTab === 'projects' ? 'Dự án của bạn' : 'Quản lý tài chính'}</h2>
+            <h2 className="text-3xl font-black tracking-tight">
+                {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
+                 activeTab === 'projects' ? 'Dự án của bạn' : 
+                 activeTab === 'clients' ? 'Quản lý Công ty' :
+                 'Quản lý tài chính'}
+            </h2>
             <p className="text-slate-500 font-medium">Bạn có {stats.activeCount} dự án đang tiến hành.</p>
           </div>
           <button onClick={() => setIsAddingProject(true)} className="group flex items-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-xl shadow-indigo-500/20 active:scale-95">
@@ -485,6 +695,103 @@ const App: React.FC = () => {
               ))}
             </div>
           </div>
+        )}
+
+        {activeTab === 'clients' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                {/* Add New Client Section */}
+                <div className={`p-8 rounded-[2.5rem] border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                    <h3 className="text-xl font-black mb-6 flex items-center gap-2"><Plus size={24} className="text-indigo-500"/>Thêm công ty mới</h3>
+                    
+                    {/* Updated Layout: Vertical Stacking */}
+                    <div className="flex flex-col gap-6">
+                        {/* Row 1: Name Input (Full width) */}
+                        <div className="w-full space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên công ty</label>
+                            <input 
+                                value={tabClientName}
+                                onChange={(e) => setTabClientName(e.target.value)}
+                                placeholder="Nhập tên..."
+                                className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`}
+                            />
+                        </div>
+
+                        {/* Row 2: Color and Button */}
+                        <div className="flex flex-col md:flex-row gap-6 md:items-end">
+                            <div className="space-y-2 flex-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Màu đại diện</label>
+                                <div className="flex gap-2 flex-wrap">
+                                    {PASTEL_PALETTE.map((c) => (
+                                        <button 
+                                            key={c.hex} 
+                                            type="button"
+                                            onClick={() => setTabClientColor(c.hex)}
+                                            className={`w-10 h-10 rounded-full border-4 transition-transform hover:scale-110 ${tabClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                                            style={{backgroundColor: c.hex}}
+                                            title={c.name}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleAddClientFromTab}
+                                disabled={!tabClientName.trim()}
+                                className="h-[60px] px-8 rounded-2xl bg-indigo-600 text-white font-black hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-xl shadow-indigo-500/20"
+                            >
+                                Thêm ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Clients List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {clients.map(client => {
+                        // Calculate stats for each client
+                        const clientProjects = projects.filter(p => p.clientName === client.name);
+                        const totalRevenue = clientProjects.reduce((sum, p) => sum + p.budget, 0);
+                        const projectCount = clientProjects.length;
+
+                        return (
+                            <div key={client.id} className={`group relative p-6 rounded-[2rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
+                                <div className="absolute top-6 right-6">
+                                    <button 
+                                        onClick={() => handleDeleteClient(client.id)}
+                                        className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors"
+                                    >
+                                        <Trash2 size={16}/>
+                                    </button>
+                                </div>
+                                
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-16 h-16 rounded-2xl shadow-inner" style={{backgroundColor: client.color}} />
+                                    <div>
+                                        <h4 className="text-lg font-black">{client.name}</h4>
+                                        <p className="text-xs text-slate-400 font-medium">Khách hàng thân thiết</p>
+                                    </div>
+                                </div>
+                                
+                                <div className={`grid grid-cols-2 gap-4 p-4 rounded-2xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Dự án</p>
+                                        <p className="text-xl font-black">{projectCount}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Doanh thu</p>
+                                        <p className="text-xl font-black text-emerald-500 tracking-tighter">{formatVND(totalRevenue)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    
+                    {clients.length === 0 && (
+                        <div className="col-span-full text-center py-10 text-slate-400 italic">
+                            Chưa có công ty nào. Hãy thêm mới!
+                        </div>
+                    )}
+                </div>
+            </div>
         )}
 
         {activeTab === 'finance' && (
@@ -580,7 +887,7 @@ const App: React.FC = () => {
                         <ChevronDown size={16} className={`text-slate-400 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
                     </div>
 
-                    {/* Dropdown Menu */}
+                    {/* Dropdown Menu - Simplified (No Delete) */}
                     {isClientDropdownOpen && (
                         <div className={`absolute top-[110%] left-0 right-0 rounded-2xl shadow-xl border z-20 overflow-hidden animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                             {!isAddingNewClient ? (
@@ -589,23 +896,13 @@ const App: React.FC = () => {
                                         {clients.map(client => (
                                             <div 
                                                 key={client.id}
-                                                className={`group flex items-center justify-between px-6 py-3 cursor-pointer transition-colors ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-between px-6 py-3 transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setSelectedClientId(client.id); setIsClientDropdownOpen(false); }}
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-3 h-3 rounded-full" style={{backgroundColor: client.color}} />
                                                     <span className="font-bold text-sm">{client.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {selectedClientId === client.id && <Check size={14} className="text-indigo-500"/>}
-                                                    <button 
-                                                        type="button"
-                                                        onClick={(e) => handleDeleteClient(e, client.id)}
-                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
-                                                        title="Xóa công ty"
-                                                    >
-                                                        <Trash2 size={14}/>
-                                                    </button>
+                                                    {selectedClientId === client.id && <Check size={14} className="text-indigo-500 ml-2"/>}
                                                 </div>
                                             </div>
                                         ))}
@@ -621,7 +918,7 @@ const App: React.FC = () => {
                                     </div>
                                 </>
                             ) : (
-                                // Add New Client Mode
+                                // Add New Client Mode within Dropdown (Quick Add)
                                 <div className="p-4 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase text-slate-400">Công ty mới</span>
@@ -693,14 +990,15 @@ const App: React.FC = () => {
                                         <p className="font-bold text-sm">{t.title}</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400"><Calendar size={10}/> {formatDateDisplay(t.dueDate)}</span>
+                                            {/* Formatted Task Budget */}
                                             <input 
-                                                type="number" 
+                                                type="text" 
                                                 placeholder="Budget..." 
-                                                value={t.budget || ''} 
+                                                value={formatNumber(t.budget)} 
                                                 onChange={(e) => {
-                                                    const newBudget = Number(e.target.value);
+                                                    const rawVal = parseNumber(e.target.value);
                                                     const newTasks = [...tempTasks];
-                                                    newTasks[idx].budget = newBudget;
+                                                    newTasks[idx].budget = rawVal;
                                                     setTempTasks(newTasks);
                                                 }}
                                                 className={`w-24 text-[10px] font-bold bg-transparent border-b border-dashed outline-none ${isDarkMode ? 'border-slate-600 placeholder:text-slate-600' : 'border-slate-300 placeholder:text-slate-400'}`}
@@ -722,10 +1020,10 @@ const App: React.FC = () => {
                          <div>
                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng Budget (VNĐ)</label>
                              <input 
-                                value={complexBudget} 
-                                onChange={(e) => setComplexBudget(Number(e.target.value))} 
-                                type="number" 
-                                className={`w-full mt-1 px-4 py-3 rounded-2xl outline-none border-2 transition-all font-black text-lg ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} 
+                                value={formatNumber(complexBudget)} 
+                                readOnly
+                                type="text" 
+                                className={`w-full mt-1 px-4 py-3 rounded-2xl outline-none border-2 transition-all font-black text-lg ${isDarkMode ? 'bg-slate-800 border-slate-800' : 'bg-slate-50 border-slate-50'}`} 
                              />
                              <p className="text-[10px] text-slate-500 mt-1">*Tự động cộng từ task con</p>
                          </div>
@@ -746,7 +1044,18 @@ const App: React.FC = () => {
                             className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-indigo-50/50 border-indigo-100 focus:border-indigo-500 text-indigo-700'}`} 
                         />
                     </div>
-                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget (VNĐ)</label><input required name="budget" type="number" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-black ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="0" /></div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget (VNĐ)</label>
+                        <input 
+                            name="budget" 
+                            type="text" 
+                            required
+                            value={formBudgetDisplay}
+                            onChange={(e) => setFormBudgetDisplay(formatNumber(parseNumber(e.target.value)))}
+                            className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-black ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} 
+                            placeholder="0" 
+                        />
+                    </div>
                 </div>
               )}
 
@@ -760,177 +1069,6 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const FilterButton: React.FC<{ active: boolean; onClick: () => void; label: string; isDarkMode: boolean }> = ({ active, onClick, label, isDarkMode }) => (
-  <button onClick={onClick} className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${active ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400 hover:text-slate-500'}`}>{label}</button>
-);
-
-const NavItem: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string; isDarkMode: boolean }> = ({ active, onClick, icon, label, isDarkMode }) => (
-  <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold text-sm ${active ? (isDarkMode ? 'bg-slate-800 text-indigo-400' : 'bg-slate-100 text-slate-900') : (isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50/50')}`}>{icon}{label}</button>
-);
-
-const DashboardCard: React.FC<{ label: string; value: string; icon: React.ReactNode; trend: string; isDarkMode: boolean }> = ({ label, value, icon, trend, isDarkMode }) => (
-  <div className={`p-7 rounded-[2rem] border shadow-sm transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-    <div className="flex justify-between items-start mb-4"><div className={`p-3.5 rounded-2xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>{icon}</div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{trend}</span></div>
-    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <h4 className="text-2xl font-black tracking-tight">{value}</h4>
-  </div>
-);
-
-const ProjectCard: React.FC<{ 
-  project: Project; 
-  isDarkMode: boolean;
-  onDelete: () => void; 
-  onUpdateTask: (tid: string, updates: Partial<Task>) => void;
-  onUpdateProject: (updates: Partial<Project>) => void;
-  onAddTask: (title: string) => void;
-}> = ({ project, isDarkMode, onDelete, onUpdateTask, onUpdateProject, onAddTask }) => {
-  const [expanded, setExpanded] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [showColorPickerFor, setShowColorPickerFor] = useState<string | null>(null);
-  const [isEditingBudget, setIsEditingBudget] = useState(false);
-  const [quickTaskTitle, setQuickTaskTitle] = useState('');
-
-  const completedCount = project.tasks.filter(t => t.completed).length;
-  const progress = project.tasks.length > 0 ? (completedCount / project.tasks.length) * 100 : 0;
-
-  const handleQuickTaskAdd = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      onAddTask(quickTaskTitle);
-      setQuickTaskTitle('');
-    }
-  };
-
-  const handleTaskDateBlur = (tid: string, value: string) => {
-      const parsed = parseSmartDate(value);
-      if(parsed) onUpdateTask(tid, { dueDate: parsed });
-  }
-  
-  return (
-    <div className={`rounded-[2.5rem] border p-8 flex flex-col hover:shadow-2xl transition-all group relative ${isDarkMode ? 'bg-slate-900 hover:shadow-indigo-500/5' : 'bg-white hover:shadow-slate-100'} ${project.isUrgent ? 'border-orange-500/30' : (isDarkMode ? 'border-slate-800' : 'border-slate-100')}`}>
-      {project.isUrgent && <div className="absolute -top-3 left-8 bg-orange-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse flex items-center gap-1 shadow-lg shadow-orange-500/20"><Flame size={12} /> GẤP</div>}
-      
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <select value={project.status} onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none border-none cursor-pointer ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-500' : project.status === ProjectStatus.IN_PROGRESS ? 'bg-indigo-500/10 text-indigo-500' : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>
-              {Object.values(ProjectStatus).map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            {project.type === 'complex' && <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-full dark:bg-slate-800">DỰ ÁN LỚN</span>}
-          </div>
-          <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-500 transition-colors">{project.projectName}</h3>
-          
-          {/* Client Badge with Pastel Color */}
-          <div className="mt-2 flex items-center gap-2">
-              <span 
-                className="px-3 py-1 rounded-lg text-xs font-bold text-slate-800 flex items-center gap-1.5 shadow-sm"
-                style={{backgroundColor: project.clientColor || '#e2e8f0'}}
-              >
-                  <Building2 size={12} className="opacity-50"/>
-                  {project.clientName}
-              </span>
-          </div>
-
-        </div>
-        <div className="flex gap-1">
-          <button onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })} className={`p-2.5 rounded-xl transition-colors ${project.isUrgent ? 'text-orange-500 bg-orange-500/10' : 'text-slate-500 hover:bg-slate-800'}`}><Flame size={20} /></button>
-          <button onClick={onDelete} className={`p-2.5 rounded-xl transition-all ${isDarkMode ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}><Trash2 size={20} /></button>
-        </div>
-      </div>
-
-      <div className={`mb-6 p-5 rounded-3xl border transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50/50 border-slate-100/50'}`}>
-        <div className="flex justify-between items-center mb-3"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiến độ</p><p className="text-xs font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md">{completedCount}/{project.tasks.length} task</p></div>
-        <div className={`h-3 w-full rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'}`}><div className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out" style={{width: `${progress}%`}} /></div>
-        <div className="mt-4 flex gap-2">
-          <button onClick={() => onUpdateProject({ tasks: project.tasks.map(t => ({ ...t, completed: true })) })} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-500' : 'bg-white border border-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'}`}><CheckCheck size={14} /> Done All</button>
-          <button onClick={() => onUpdateProject({ paymentStatus: project.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${project.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-amber-500/10' : 'bg-white border border-slate-100 text-slate-600 hover:bg-amber-50')}`}><Banknote size={14} /> {project.paymentStatus === PaymentStatus.PAID ? 'ĐÃ NHẬN' : 'CHƯA NHẬN'}</button>
-        </div>
-      </div>
-
-      <div className="space-y-3 mb-4">
-        {project.tasks.slice(0, expanded ? undefined : 2).map(task => (
-          <div key={task.id} className={`relative group/task flex items-center gap-3 p-4 rounded-2xl border transition-all shadow-sm overflow-hidden ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-white border-slate-100'}`}>
-            <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: task.color || '#e2e8f0' }} />
-            <input type="checkbox" checked={task.completed} onChange={() => onUpdateTask(task.id, { completed: !task.completed })} className="ml-2 w-5 h-5 rounded-lg border-2 border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
-            <div className="flex-1 min-w-0">
-              {editingTaskId === task.id ? (
-                <div className="flex flex-col gap-2">
-                  <input autoFocus value={task.title} onChange={(e) => onUpdateTask(task.id, { title: e.target.value })} className={`w-full text-sm font-bold border-none rounded p-1 outline-none ring-1 ring-indigo-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`} />
-                  <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-slate-400 uppercase">Deadline:</span>
-                      <input 
-                        type="text" 
-                        placeholder="VD: 134, 13/4"
-                        defaultValue={task.dueDate} // Use defaultValue so user can edit raw text
-                        onBlur={(e) => handleTaskDateBlur(task.id, e.target.value)}
-                        className={`w-24 text-[10px] font-bold border-none rounded p-1 outline-none ring-1 ring-indigo-200 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`} 
-                      />
-                  </div>
-                </div>
-              ) : (
-                <div onClick={() => setEditingTaskId(task.id)} className="cursor-pointer">
-                  <div className="flex justify-between items-start">
-                    <p className={`text-sm font-bold truncate ${task.completed ? 'text-slate-500 line-through opacity-50' : ''}`}>{task.title}</p>
-                    {task.budget && <span className="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-1.5 py-0.5 rounded ml-2 dark:bg-emerald-500/10">{formatVND(task.budget)}</span>}
-                  </div>
-                  <div className="flex items-center gap-1 mt-0.5"><Clock size={10} className="text-slate-500" /><p className="text-[10px] font-bold text-slate-500">{formatDateDisplay(task.dueDate)}</p></div>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover/task:opacity-100 transition-opacity">
-              {editingTaskId === task.id ? <button onClick={() => setEditingTaskId(null)} className="p-1.5 rounded-lg bg-indigo-600 text-white"><Save size={14}/></button> : <><button onClick={() => setShowColorPickerFor(showColorPickerFor === task.id ? null : task.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-500 hover:bg-slate-700/50"><Palette size={14}/></button><button onClick={() => setEditingTaskId(task.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-500 hover:bg-slate-700/50"><Edit2 size={14}/></button></>}
-            </div>
-            {showColorPickerFor === task.id && (<div className={`absolute right-10 top-2 bottom-2 border rounded-xl shadow-xl z-10 flex items-center gap-1.5 px-3 py-1 animate-in slide-in-from-right-2 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'}`}>{TASK_COLORS.map(c => <button key={c.value} onClick={() => { onUpdateTask(task.id, { color: c.value }); setShowColorPickerFor(null); }} className="w-5 h-5 rounded-full hover:scale-125 transition-transform border border-white" style={{backgroundColor: c.value}} />)}<button onClick={() => setShowColorPickerFor(null)} className="ml-1 text-slate-500"><X size={12}/></button></div>)}
-          </div>
-        ))}
-        
-        {/* Quick Task Input */}
-        <div className={`flex items-center gap-2 p-1.5 rounded-2xl border border-dashed transition-all ${isDarkMode ? 'border-slate-800 hover:border-indigo-500/50' : 'border-slate-200 hover:border-indigo-500/50'}`}>
-          <div className="flex-1 flex items-center gap-2 pl-2">
-            <Plus size={14} className="text-indigo-500" />
-            <input 
-              value={quickTaskTitle}
-              onChange={(e) => setQuickTaskTitle(e.target.value)}
-              onKeyDown={handleQuickTaskAdd}
-              placeholder="Thêm task nhanh (Enter)..." 
-              className={`w-full text-xs font-bold bg-transparent border-none outline-none ${isDarkMode ? 'placeholder:text-slate-600' : 'placeholder:text-slate-300'}`}
-            />
-          </div>
-        </div>
-
-        {project.tasks.length > 2 && <button onClick={() => setExpanded(!expanded)} className="w-full text-[11px] font-black text-indigo-500 uppercase tracking-widest py-2 hover:bg-indigo-500/10 rounded-xl transition-all flex items-center justify-center gap-1">{expanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}{expanded ? 'Thu gọn' : `Xem thêm ${project.tasks.length - 2} task`}</button>}
-      </div>
-
-      <div className={`pt-8 border-t mt-auto flex justify-between items-end ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
-        <div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Hạn cuối</p>
-          <div className={`flex items-center gap-2 text-sm font-black px-3 py-1.5 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><Calendar size={16} className="text-indigo-500" />{formatDateDisplay(project.deadline)}</div>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Budget</p>
-          <div className="flex flex-col items-end gap-1">
-            {isEditingBudget ? (
-              <input 
-                type="number" 
-                autoFocus
-                onBlur={() => setIsEditingBudget(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setIsEditingBudget(false)}
-                value={project.budget}
-                onChange={(e) => onUpdateProject({ budget: Number(e.target.value) })}
-                className={`w-32 text-right px-2 py-1 rounded-lg text-xl font-black outline-none ring-2 ring-indigo-500 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}
-              />
-            ) : (
-              <div onClick={() => setIsEditingBudget(true)} className="flex items-center gap-2 cursor-pointer group/budget">
-                <p className="text-2xl font-black tracking-tighter transition-colors group-hover/budget:text-indigo-500">{formatVND(project.budget)}</p>
-                <div className={`p-1 rounded-md opacity-0 group-hover/budget:opacity-100 transition-opacity ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}><Coins size={14}/></div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
