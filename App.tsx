@@ -59,7 +59,11 @@ import {
   Coffee,
   Timer,
   History,
-  Volume2
+  Volume2,
+  CalendarDays,
+  Image,
+  Lock,
+  CalendarCheck
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -136,6 +140,12 @@ const formatDateDisplay = (isoDate: string) => {
   return `${d}/${m}`;
 }
 
+const getFullDateDisplay = () => {
+    const date = new Date();
+    const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    return `${days[date.getDay()]}, ${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+};
+
 // Hàm tính toán deadline dự án dựa trên task con
 const calculateProjectDeadline = (tasks: Task[], currentDeadline: string): string => {
     if (!tasks || tasks.length === 0) return currentDeadline;
@@ -143,7 +153,7 @@ const calculateProjectDeadline = (tasks: Task[], currentDeadline: string): strin
     if (timestamps.length === 0) return currentDeadline;
     const maxTs = Math.max(...timestamps);
     
-    // Nếu deadline hiện tại nhỏ hơn max task deadline, thì update. 
+    // Luôn trả về ngày xa nhất của task con
     return new Date(maxTs).toISOString().split('T')[0];
 };
 
@@ -367,9 +377,10 @@ const MiniFocusTimer: React.FC<{
     phase: 'setup' | 'active' | 'break';
     isActive: boolean;
     isDarkMode: boolean;
+    isSidebarCollapsed: boolean;
     onToggle: () => void;
     onClick: () => void;
-}> = ({ timeLeft, phase, isActive, isDarkMode, onToggle, onClick }) => {
+}> = ({ timeLeft, phase, isActive, isDarkMode, isSidebarCollapsed, onToggle, onClick }) => {
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -377,8 +388,8 @@ const MiniFocusTimer: React.FC<{
     };
 
     return (
-        <div className={`animate-in slide-in-from-left-2 duration-500`}>
-            <div className={`mx-4 mb-4 p-3 rounded-xl border shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isDarkMode ? 'bg-slate-900/90 border-slate-700 backdrop-blur-md' : 'bg-white/90 border-slate-200 backdrop-blur-md'}`}>
+        <div className={`transition-all duration-500 z-50 ${isSidebarCollapsed ? 'fixed bottom-6 right-6 w-80 shadow-2xl animate-in slide-in-from-right-4' : 'mx-4 mb-4 animate-in slide-in-from-left-2'}`}>
+            <div className={`p-3 rounded-xl border shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isDarkMode ? 'bg-slate-900/95 border-slate-700 backdrop-blur-md' : 'bg-white/95 border-slate-200 backdrop-blur-md'}`}>
                 <div className="flex items-center justify-between gap-3" onClick={onClick}>
                     <div className={`p-2 rounded-lg ${phase === 'break' ? 'bg-emerald-100 text-emerald-600' : 'bg-violet-100 text-violet-600'}`}>
                         {phase === 'break' ? <Coffee size={16}/> : <Zap size={16}/>}
@@ -418,7 +429,7 @@ interface FocusModeProps {
     startFocus: () => void;
     stopFocus: () => void;
     formatTime: (seconds: number) => string;
-    projects?: Project[]; // Added optional projects prop for compatibility
+    projects?: Project[];
 }
 
 const FocusMode: React.FC<FocusModeProps> = ({ 
@@ -437,7 +448,7 @@ const FocusMode: React.FC<FocusModeProps> = ({
     stopFocus,
     formatTime
 }) => {
-    // Content State (Local because it can be lost/reset on tab switch if needed, or lift if audio persistence is required - sticking to simple prompt)
+    // Content State
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [embeddedId, setEmbeddedId] = useState('');
 
@@ -505,7 +516,6 @@ const FocusMode: React.FC<FocusModeProps> = ({
         );
     }
 
-    // Active Phase UI
     return (
         <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
             {/* Top Bar with Mini Timer Card */}
@@ -620,6 +630,89 @@ const FilterButton: React.FC<{
   </button>
 );
 
+const TaskItem: React.FC<{
+  task: Task;
+  isDarkMode: boolean;
+  onUpdate: (updates: Partial<Task>) => void;
+}> = ({ task, isDarkMode, onUpdate }) => {
+  const [dateStr, setDateStr] = useState(formatDateDisplay(task.dueDate));
+  const [budgetStr, setBudgetStr] = useState(formatNumber(task.budget));
+  const [titleStr, setTitleStr] = useState(task.title);
+
+  useEffect(() => { setDateStr(formatDateDisplay(task.dueDate)); }, [task.dueDate]);
+  useEffect(() => { setBudgetStr(formatNumber(task.budget)); }, [task.budget]);
+  useEffect(() => { setTitleStr(task.title); }, [task.title]);
+
+  const handleDateBlur = () => {
+      const newDate = parseSmartDate(dateStr);
+      if (newDate && newDate !== task.dueDate) {
+          onUpdate({ dueDate: newDate });
+          setDateStr(formatDateDisplay(newDate)); 
+      } else {
+          setDateStr(formatDateDisplay(task.dueDate));
+      }
+  };
+
+  const handleBudgetBlur = () => {
+      const num = parseNumber(budgetStr);
+      if (num !== task.budget) {
+          onUpdate({ budget: num });
+      }
+  };
+
+  const handleTitleBlur = () => {
+      if (titleStr !== task.title) {
+          onUpdate({ title: titleStr });
+      }
+  }
+
+  return (
+    <div className={`flex items-center gap-3 py-2 px-3 rounded-lg border transition-all duration-200 group/item ${isDarkMode ? 'bg-slate-900 border-slate-700 hover:border-slate-600' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
+         <button
+            onClick={() => onUpdate({ completed: !task.completed })}
+            className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors duration-300 ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-600 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
+         >
+            {task.completed && <Check size={10} strokeWidth={4} />}
+         </button>
+         
+         <input
+            value={titleStr}
+            onChange={(e) => setTitleStr(e.target.value)}
+            onBlur={handleTitleBlur}
+            className={`text-xs font-medium block flex-1 bg-transparent outline-none truncate transition-colors duration-300 ${task.completed ? 'text-slate-400 line-through' : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}`}
+         />
+            
+         <div className="flex items-center gap-3">
+            {/* Date Edit */}
+            <div className="flex items-center gap-1 group/date relative opacity-80 hover:opacity-100 transition-opacity duration-200">
+                <Clock size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
+                <input
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    onBlur={handleDateBlur}
+                    placeholder="dd/mm"
+                    className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-10 text-right transition-all ${isDarkMode ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-300'}`}
+                />
+            </div>
+
+            {/* Budget Edit */}
+            <div className="flex items-center gap-1 group/budget relative opacity-80 hover:opacity-100 transition-opacity duration-200">
+                <input
+                    value={budgetStr}
+                    onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setBudgetStr(formatNumber(val));
+                    }}
+                    onBlur={handleBudgetBlur}
+                    placeholder="0"
+                    className={`text-[10px] font-mono font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-16 text-right transition-all ${isDarkMode ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-300'}`}
+                />
+            </div>
+         </div>
+    </div>
+  );
+}
+
 const ProjectRow: React.FC<{
   isDarkMode: boolean;
   project: Project;
@@ -630,133 +723,248 @@ const ProjectRow: React.FC<{
   onPrintInvoice: (project: Project) => void;
   isHighlighted?: boolean;
 }> = ({ isDarkMode, project, onDelete, onUpdateTask, onUpdateProject, onAddTask, onPrintInvoice, isHighlighted }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  
-  // Calculate stats
-  const completed = project.tasks.filter(t => t.completed).length;
-  const total = project.tasks.length;
-  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const [isExpanded, setIsExpanded] = useState(isHighlighted || false);
+  const [localBudget, setLocalBudget] = useState(formatNumber(project.budget));
+  const [localDate, setLocalDate] = useState(formatDateDisplay(project.deadline));
+
+  useEffect(() => {
+    setLocalBudget(formatNumber(project.budget));
+  }, [project.budget]);
+
+  useEffect(() => {
+    setLocalDate(formatDateDisplay(project.deadline));
+  }, [project.deadline]);
+
+  useEffect(() => {
+      if (isHighlighted) {
+          setIsExpanded(true);
+      }
+  }, [isHighlighted]);
+
+  const completedTasks = project.tasks.filter(t => t.completed).length;
+  const totalTasks = project.tasks.length;
+  const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+  const isComplex = totalTasks > 0;
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTaskTitle.trim()) {
-        onAddTask(newTaskTitle);
-        setNewTaskTitle('');
+      onAddTask(newTaskTitle);
+      setNewTaskTitle('');
     }
+  };
+
+  const getStatusColorClass = (status: ProjectStatus) => {
+    switch (status) {
+      case ProjectStatus.COMPLETED: return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case ProjectStatus.IN_PROGRESS: return 'bg-blue-100 text-blue-600 border-blue-200';
+      case ProjectStatus.PLANNING: return 'bg-slate-100 text-slate-600 border-slate-200';
+      case ProjectStatus.REVIEW: return 'bg-purple-100 text-purple-600 border-purple-200';
+      case ProjectStatus.ON_HOLD: return 'bg-amber-100 text-amber-600 border-amber-200';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  const togglePaymentStatus = () => {
+    onUpdateProject({ 
+        paymentStatus: project.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID 
+    });
+  };
+
+  const handleProjectBudgetBlur = () => {
+      const num = parseNumber(localBudget);
+      if (num !== project.budget) {
+          onUpdateProject({ budget: num });
+      }
+  };
+
+  const handleProjectDateBlur = () => {
+      const newDate = parseSmartDate(localDate);
+      if (newDate && newDate !== project.deadline) {
+          onUpdateProject({ deadline: newDate });
+          setLocalDate(formatDateDisplay(newDate));
+      } else {
+          setLocalDate(formatDateDisplay(project.deadline));
+      }
   };
 
   return (
     <div 
         id={`project-${project.id}`}
-        className={`rounded-2xl border shadow-sm transition-all duration-500 ${
-            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
-        } ${isHighlighted ? 'ring-2 ring-indigo-500 shadow-indigo-500/20' : ''}`}
+        // Added overflow-hidden to clip progress bar
+        className={`group relative transition-all duration-300 rounded-2xl border overflow-hidden ${isHighlighted ? 'ring-2 ring-indigo-500 shadow-xl scale-[1.01]' : (isExpanded ? 'shadow-lg ring-1 ring-indigo-500/10' : 'shadow-sm hover:shadow-md hover:translate-y-[-2px]')} ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}
     >
-      {/* Header */}
-      <div className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center justify-between">
-         {/* ... Info section ... */}
-         <div className="flex-1 min-w-0">
-             <div className="flex items-center gap-3 mb-1">
-                 <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: project.clientColor || '#cbd5e1'}} />
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">{project.clientName}</span>
-                 {project.isUrgent && <span className="flex items-center gap-1 text-[10px] font-black text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full"><Flame size={10} fill="currentColor"/> GẤP</span>}
-             </div>
-             <h3 className="text-lg font-black truncate pr-4">{project.projectName}</h3>
-             <div className="flex items-center gap-4 mt-2">
-                 <div className={`text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 ${
-                     project.status === ProjectStatus.COMPLETED 
-                        ? 'bg-emerald-500/10 text-emerald-600' 
-                        : isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
-                 }`}>
-                     {project.status === ProjectStatus.COMPLETED ? <CheckCircle2 size={12}/> : <Clock size={12}/>}
-                     {project.status}
-                 </div>
-                 <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
-                     <Calendar size={12}/> {formatDateDisplay(project.deadline)}
-                 </div>
-                 <div className="text-xs font-mono font-bold text-slate-400 flex items-center gap-1.5">
-                     <DollarSign size={12}/> {formatNumber(project.budget)}
-                 </div>
-             </div>
-         </div>
+        {/* Main Row Content */}
+        <div className="flex flex-col md:flex-row items-center gap-4 p-5">
+            
+            {/* NEW: Isolated Done Button Area at Start */}
+            <div className={`pr-4 border-r ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                 <button 
+                    onClick={() => {
+                        if (project.status === ProjectStatus.COMPLETED) {
+                            onUpdateProject({ status: ProjectStatus.IN_PROGRESS });
+                        } else {
+                            onUpdateProject({ status: ProjectStatus.COMPLETED });
+                        }
+                    }}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500 text-white scale-100 shadow-lg shadow-emerald-500/30' : (isDarkMode ? 'bg-slate-800 text-slate-500 hover:text-emerald-500 hover:bg-slate-700' : 'bg-slate-100 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50')}`}
+                    title={project.status === ProjectStatus.COMPLETED ? "Mở lại dự án" : "Hoàn thành dự án"}
+                >
+                    <Check size={20} strokeWidth={3} />
+                </button>
+            </div>
 
-         {/* Actions */}
-         <div className="flex items-center gap-3 self-end sm:self-center">
-             <button onClick={() => onPrintInvoice(project)} className="p-2 text-slate-400 hover:text-indigo-500 transition-colors" title="In hóa đơn"><Printer size={18}/></button>
-             <button onClick={onDelete} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Xóa dự án"><Trash2 size={18}/></button>
-             <button 
-                onClick={() => setIsExpanded(!isExpanded)}
-                className={`p-2 rounded-lg transition-all ${isExpanded ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-             >
-                 {isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}
-             </button>
-         </div>
-      </div>
+            {/* Left: Info */}
+            <div className="flex-1 min-w-0 w-full">
+                <div className="flex items-center gap-3 mb-1.5">
+                    {/* Status Dropdown */}
+                    <div className="relative group/status">
+                        <select 
+                            value={project.status}
+                            onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })}
+                            className={`appearance-none pl-6 pr-6 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider cursor-pointer outline-none transition-colors border ${getStatusColorClass(project.status)}`}
+                        >
+                            <option value={ProjectStatus.PLANNING}>Planning</option>
+                            <option value={ProjectStatus.IN_PROGRESS}>In Progress</option>
+                            <option value={ProjectStatus.REVIEW}>Review</option>
+                            <option value={ProjectStatus.ON_HOLD}>On Hold</option>
+                            <option value={ProjectStatus.COMPLETED}>Completed</option>
+                        </select>
+                        <div className={`absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-colors ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500' : 'bg-current opacity-50'}`} />
+                        <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 transition-transform group-hover/status:rotate-180" />
+                    </div>
 
-      {/* Expanded Content */}
-      {isExpanded && (
-          <div className={`border-t p-4 sm:p-6 animate-in slide-in-from-top-2 ${isDarkMode ? 'border-slate-800 bg-slate-800/20' : 'border-slate-50 bg-slate-50/50'}`}>
-              {/* Progress Bar */}
-              <div className="mb-6">
-                  <div className="flex justify-between text-xs font-bold mb-2 text-slate-500">
-                      <span>Tiến độ công việc</span>
-                      <span>{progress}% ({completed}/{total})</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-200 overflow-hidden dark:bg-slate-700">
-                      <div className="h-full bg-indigo-500 transition-all duration-500" style={{width: `${progress}%`}} />
-                  </div>
-              </div>
-              
-              {/* Tasks List */}
-              <div className="space-y-3 mb-6">
-                  {project.tasks.map(task => (
-                      <div key={task.id} className={`group flex items-center gap-3 p-3 rounded-xl border transition-all ${task.completed ? 'opacity-60 bg-slate-50 border-transparent dark:bg-slate-800/50' : isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                          <button 
-                            onClick={() => onUpdateTask(task.id, { completed: !task.completed })}
-                            className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 text-transparent hover:border-indigo-400'}`}
-                          >
-                              <Check size={12} strokeWidth={4} />
-                          </button>
-                          
-                          <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-bold truncate ${task.completed ? 'line-through text-slate-400' : ''}`}>{task.title}</p>
-                              <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1"><Calendar size={10}/> {formatDateDisplay(task.dueDate)}</span>
-                                  {task.budget && task.budget > 0 && <span className="text-[10px] font-mono font-bold text-slate-400 flex items-center gap-1"><DollarSign size={10}/> {formatNumber(task.budget)}</span>}
-                              </div>
-                          </div>
-                      </div>
-                  ))}
-              </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 truncate max-w-[100px]">
+                        {project.clientName}
+                    </span>
+                    
+                    {/* Urgent Toggle Button */}
+                    <button 
+                        onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })}
+                        className={`p-1 rounded-md transition-all duration-300 ${project.isUrgent ? 'text-orange-500 bg-orange-100 scale-110' : 'text-slate-300 hover:text-orange-400 hover:scale-110'}`}
+                        title={project.isUrgent ? "Bỏ gấp" : "Đánh dấu Gấp"}
+                    >
+                        <Flame size={14} fill={project.isUrgent ? "currentColor" : "none"} />
+                    </button>
+                </div>
 
-              {/* Add Task Input */}
-              <form onSubmit={handleAddTask} className="flex gap-2">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold truncate transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400" title={project.projectName}>{project.projectName}</h3>
+                </div>
+            </div>
+
+            {/* Middle: Stats (Budget & Deadline) */}
+            <div className="flex items-center gap-6 md:gap-8 w-full md:w-auto mt-2 md:mt-0 justify-between md:justify-end">
+                
+                {/* Deadline */}
+                <div className="flex flex-col items-start md:items-end min-w-[80px]">
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Deadline</span>
+                    <div className="flex items-center gap-1.5 group/date">
+                        <Calendar size={12} className="opacity-50 text-slate-400"/> 
+                        <input 
+                            value={localDate}
+                            disabled={isComplex}
+                            onChange={(e) => setLocalDate(e.target.value)}
+                            onBlur={handleProjectDateBlur}
+                            placeholder="dd/mm"
+                            className={`text-xs font-bold bg-transparent border-b border-transparent outline-none w-12 text-right transition-all ${isDarkMode ? 'text-slate-300' : 'text-slate-700'} ${!isComplex ? 'hover:border-dashed border-slate-300 dark:border-slate-600' : 'opacity-70 cursor-not-allowed'}`}
+                            title={isComplex ? "Ngày được tính tự động từ các task con" : "Sửa ngày deadline"}
+                        />
+                    </div>
+                </div>
+
+                {/* Budget */}
+                <div className="flex flex-col items-start md:items-end min-w-[120px]">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Ngân sách</span>
+                        {/* Payment Status Toggle */}
+                        <button 
+                            onClick={togglePaymentStatus}
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all hover:scale-105 active:scale-95 ${project.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' : 'bg-amber-100 text-amber-600 hover:bg-amber-200'}`}
+                        >
+                            {project.paymentStatus === PaymentStatus.PAID ? 'Đã thu' : 'Chờ thu'}
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-1 group/input">
+                        <input
+                            type="text"
+                            value={localBudget}
+                            readOnly={isComplex}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                setLocalBudget(formatNumber(val));
+                            }}
+                            onBlur={handleProjectBudgetBlur}
+                            title={isComplex ? "Ngân sách được cộng từ các task con" : "Nhập số tiền"}
+                            className={`w-full text-right bg-transparent border-b border-transparent outline-none font-mono font-bold text-sm transition-colors ${isDarkMode ? 'text-slate-200' : 'text-slate-700'} ${!isComplex ? 'hover:border-dashed border-slate-300 dark:border-slate-700' : 'cursor-default opacity-80'}`}
+                        />
+                        <span className="text-[9px] font-bold text-slate-400">₫</span>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 pl-4 border-l border-slate-100 dark:border-slate-800">
+                    <button 
+                        onClick={() => onPrintInvoice(project)}
+                        className={`p-2 rounded-lg transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-50 hover:text-indigo-600 hover:scale-110'}`}
+                        title="Xuất Hóa đơn"
+                    >
+                        <Printer size={16} />
+                    </button>
+                    
+                    <button 
+                        onClick={() => onDelete()}
+                        className={`p-2 rounded-lg transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-red-400' : 'text-slate-400 hover:bg-slate-50 hover:text-red-600 hover:scale-110'}`}
+                        title="Xóa dự án"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`p-2 rounded-lg transition-all duration-300 ${isExpanded ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-50')}`}
+                    >
+                        <ChevronDown size={16} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        {/* Progress Bar (Very thin line at bottom of row) */}
+        <div className={`absolute bottom-0 left-0 right-0 h-[3px] bg-transparent rounded-b-2xl transition-all duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`}>
+             <div className={`h-full ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500' : 'bg-indigo-500'} transition-all duration-1000 ease-out`} style={{ width: `${progress}%` }} />
+        </div>
+
+        {/* Expanded Area */}
+        {isExpanded && (
+            <div className={`px-5 pb-5 pt-2 border-t animate-in slide-in-from-top-2 duration-300 ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Danh sách công việc ({completedTasks}/{totalTasks})</span>
+                    <span className="text-[10px] font-bold text-indigo-500">{progress}% Hoàn thành</span>
+                </div>
+                
+                <div className="space-y-2">
+                    {project.tasks.map(task => (
+                        <TaskItem 
+                            key={task.id}
+                            task={task}
+                            isDarkMode={isDarkMode}
+                            onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                        />
+                    ))}
+                </div>
+
+                <form onSubmit={handleAddTask} className="flex gap-2 mt-4">
                   <input 
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Thêm công việc mới..."
-                    className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold outline-none border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-200 focus:border-indigo-500 shadow-sm'}`}
+                    placeholder="Thêm đầu việc mới..."
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border outline-none bg-transparent transition-all duration-200 ${isDarkMode ? 'border-slate-700 focus:border-indigo-500' : 'border-slate-200 focus:border-indigo-500'}`}
                   />
-                  <button type="submit" disabled={!newTaskTitle.trim()} className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-lg shadow-indigo-500/20">
-                      <Plus size={20}/>
-                  </button>
-              </form>
-              
-              {/* Project Status Toggle */}
-               <div className="mt-6 flex justify-end">
-                   {project.status !== ProjectStatus.COMPLETED ? (
-                       <button onClick={() => onUpdateProject({ status: ProjectStatus.COMPLETED })} className="text-xs font-black uppercase text-emerald-500 hover:bg-emerald-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
-                           <CheckCheck size={14}/> Đánh dấu hoàn thành dự án
-                       </button>
-                   ) : (
-                       <button onClick={() => onUpdateProject({ status: ProjectStatus.IN_PROGRESS })} className="text-xs font-black uppercase text-slate-400 hover:bg-slate-100 px-3 py-2 rounded-lg transition-colors flex items-center gap-2">
-                           <RotateCcw size={14}/> Mở lại dự án
-                       </button>
-                   )}
-               </div>
-          </div>
-      )}
+                  <button type="submit" disabled={!newTaskTitle.trim()} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"><Plus size={14}/></button>
+               </form>
+            </div>
+        )}
     </div>
   );
 };
@@ -920,6 +1128,53 @@ const App: React.FC = () => {
   };
   // --- END FOCUS MODE STATE ---
 
+  // Date & Summary Helper
+  const currentDateDisplay = useMemo(() => getFullDateDisplay(), []);
+  
+  // Logic ngày cuối tháng chính xác
+  const { isMonthEnd, daysToMonthEnd } = useMemo(() => {
+      const today = new Date();
+      // Lấy ngày cuối cùng của tháng hiện tại: ngày 0 của tháng sau
+      const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      
+      const isEnd = today.getDate() === lastDayOfMonth.getDate();
+      const diffDays = lastDayOfMonth.getDate() - today.getDate();
+      
+      return { isMonthEnd: isEnd, daysToMonthEnd: diffDays };
+  }, []);
+
+  const handleGenerateMonthSummary = () => {
+      if (!isMonthEnd) return;
+
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+
+      // Lọc các dự án trong tháng này (dựa trên created date hoặc deadline)
+      const monthProjects = projects.filter(p => {
+          const d = new Date(p.createdAt);
+          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+
+      const totalEarnedMonth = monthProjects.reduce((sum, p) => sum + (p.paymentStatus === PaymentStatus.PAID ? p.budget : 0), 0);
+      const focusHours = Math.round(focusStats.monthMins / 60 * 10) / 10;
+      
+      const prompt = `Create a vertical 9:16 infographic image for my freelance monthly summary.
+Style: Clean, Minimalist, Modern, High-contrast, Swiss Design. Use bold typography for numbers. Limited color palette (mainly white background with bold accent colors like Indigo, Emerald, and Slate). Avoid clutter.
+Content to display clearly:
+- Month: ${currentMonth + 1}/${currentYear} (Make this the title)
+- Total Income: ${formatVND(totalEarnedMonth)} (Highlight this number)
+- Projects Completed: ${monthProjects.filter(p => p.status === ProjectStatus.COMPLETED).length}
+- Focus Hours: ${focusHours} hours
+- Active Projects: ${monthProjects.length}
+
+The vibe should be professional yet celebrating a month of hard work. Focus on the stats.`;
+
+      navigator.clipboard.writeText(prompt);
+      window.open('https://gemini.google.com/app', '_blank');
+      alert('Đã copy dữ liệu tổng kết tháng! Hãy dán vào Gemini để tạo ảnh.');
+  };
+
   // Persistence
   useEffect(() => {
     localStorage.setItem('ff_projects_v9', JSON.stringify(projects));
@@ -1078,16 +1333,14 @@ const App: React.FC = () => {
       if (p.id === projectId) {
         const updatedTasks = p.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t);
         
-        // Auto update deadline for all projects based on max task date
+        // Luôn tính lại deadline và budget của dự án cha nếu có task con
         let newDeadline = p.deadline;
+        let newBudget = p.budget;
+        
         if (updatedTasks.length > 0) {
              newDeadline = calculateProjectDeadline(updatedTasks, p.deadline);
-        }
-
-        // AUTO SUM: Nếu dự án là complex, cập nhật lại tổng budget dựa trên các task con
-        let newBudget = p.budget;
-        if (p.type === 'complex') {
-            newBudget = updatedTasks.reduce((sum, t) => sum + (t.budget || 0), 0);
+             // Sum budget
+             newBudget = updatedTasks.reduce((sum, t) => sum + (t.budget || 0), 0);
         }
 
         return {
@@ -1314,6 +1567,7 @@ const App: React.FC = () => {
                 phase={focusPhase}
                 isActive={focusIsActive}
                 isDarkMode={isDarkMode}
+                isSidebarCollapsed={isSidebarCollapsed}
                 onToggle={() => setFocusIsActive(!focusIsActive)}
                 onClick={() => setActiveTab('focus')}
             />
@@ -1341,23 +1595,58 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-8 h-full overflow-y-auto w-full">
+      <main className="flex-1 p-6 md:p-8 h-full overflow-y-auto w-full relative">
+        {/* NEW FIXED BUTTON - Positioned relative to viewport */}
         {activeTab !== 'focus' && (
-            <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
-            <div>
-                <h2 className="text-2xl font-black tracking-tight">
-                    {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
-                    activeTab === 'projects' ? 'Dự án của bạn' : 
-                    activeTab === 'clients' ? 'Quản lý Công ty' :
-                    activeTab === 'finance' ? 'Quản lý doanh thu' :
-                    'Trợ lý Tài chính'}
-                </h2>
-                <p className="text-slate-500 font-medium text-sm mt-1">Bạn có {stats.activeCount} dự án đang tiến hành.</p>
-            </div>
-            <button onClick={() => setIsAddingProject(true)} className="group flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 active:scale-95 text-sm">
-                <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
-                Dự án mới
+             <button 
+                onClick={() => setIsAddingProject(true)} 
+                className="fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-bold transition-all duration-300 shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 text-sm"
+            >
+                <Plus size={20} strokeWidth={2.5} />
+                <span>Dự án mới</span>
             </button>
+        )}
+
+        {activeTab !== 'focus' && (
+            <header className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
+                <div>
+                    <h2 className="text-2xl font-black tracking-tight">
+                        {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
+                        activeTab === 'projects' ? 'Dự án của bạn' : 
+                        activeTab === 'clients' ? 'Quản lý Công ty' :
+                        activeTab === 'finance' ? 'Quản lý doanh thu' :
+                        'Trợ lý Tài chính'}
+                    </h2>
+                    <p className={`font-bold mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {activeTab === 'dashboard' ? (
+                            <span className="flex items-center gap-2"><CalendarDays size={16}/> {currentDateDisplay}</span>
+                        ) : (
+                            `Bạn có ${stats.activeCount} dự án đang tiến hành.`
+                        )}
+                    </p>
+                </div>
+
+                {activeTab === 'dashboard' && (
+                    // Added margin-right xl:mr-44 to ensure Month Summary doesn't overlap fixed button
+                    <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto xl:mr-44">
+                        {/* Month Summary Button - Clean Modern Logic */}
+                        <div 
+                            className={`group flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-300 ${isMonthEnd ? 'cursor-pointer hover:shadow-lg border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900' : 'cursor-not-allowed opacity-60 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900'}`} 
+                            onClick={handleGenerateMonthSummary}
+                            title={isMonthEnd ? "Tạo báo cáo tháng ngay" : `Còn ${daysToMonthEnd} ngày nữa mới đến cuối tháng`}
+                        >
+                            <div className={`p-2 rounded-xl transition-colors ${isMonthEnd ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`}>
+                                {isMonthEnd ? <Sparkles size={18} strokeWidth={2.5}/> : <Lock size={18}/>}
+                            </div>
+                            <div className="text-right">
+                                <span className={`block text-[10px] font-black uppercase tracking-widest ${isMonthEnd ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`}>Tổng kết tháng</span>
+                                <span className={`block text-xs font-bold ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    {isMonthEnd ? "Sẵn sàng tạo" : `Còn ${daysToMonthEnd} ngày`}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </header>
         )}
 
