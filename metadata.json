@@ -1,0 +1,7 @@
+{
+  "name": "FreeFlow Manager",
+  "description": "A comprehensive freelance management tool to track multiple clients, deadlines, and financial revenue with AI-powered insights.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
