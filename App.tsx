@@ -259,6 +259,11 @@ const ProjectCard: React.FC<{
 }> = ({ isDarkMode, project, onDelete, onUpdateTask, onUpdateProject, onAddTask }) => {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [localBudget, setLocalBudget] = useState(formatNumber(project.budget));
+
+  useEffect(() => {
+    setLocalBudget(formatNumber(project.budget));
+  }, [project.budget]);
 
   const completedTasks = project.tasks.filter(t => t.completed).length;
   const totalTasks = project.tasks.length;
@@ -335,7 +340,26 @@ const ProjectCard: React.FC<{
         <div className="flex items-center justify-between text-xs font-bold text-slate-400">
            <span className="flex items-center gap-1"><Calendar size={14}/> {formatDateDisplay(project.deadline)}</span>
            <div className="flex items-center gap-2">
-               <span className="flex items-center gap-1"><Banknote size={14}/> {formatVND(project.budget)}</span>
+               {/* Editable Budget Input */}
+               <div className="flex items-center gap-1 relative group/input cursor-text">
+                   <Banknote size={14} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
+                   <input
+                     type="text"
+                     value={localBudget}
+                     onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        setLocalBudget(formatNumber(val));
+                     }}
+                     onBlur={() => {
+                        const num = parseNumber(localBudget);
+                        if (num !== project.budget) {
+                           onUpdateProject({ budget: num });
+                        }
+                     }}
+                     className={`w-[85px] bg-transparent border-b border-dashed outline-none font-bold transition-colors ${isDarkMode ? 'border-slate-700 focus:border-indigo-500 text-slate-200' : 'border-slate-300 focus:border-indigo-500 text-slate-700'}`}
+                   />
+                   <span className="text-[9px] uppercase">VNĐ</span>
+               </div>
                
                {/* Payment Status Dropdown */}
                <div className="relative">
