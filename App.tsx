@@ -8,12 +8,9 @@ import {
   Plus, 
   CheckCircle2, 
   Clock, 
-  BrainCircuit,
   Trash2,
   ChevronDown,
   ChevronUp,
-  Loader2,
-  Sparkles,
   Target,
   CheckCheck,
   Banknote,
@@ -24,7 +21,10 @@ import {
   X,
   Sun,
   Moon,
-  Coins
+  Coins,
+  Sparkles,
+  Layers,
+  FileType
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -37,11 +37,61 @@ import {
   Cell
 } from 'recharts';
 import { Project, ProjectStatus, PaymentStatus, Task } from './types';
-import { getWorkloadAdvice, parseTasksFromText } from './services/geminiService';
 
 const formatVND = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
 };
+
+// Hàm xử lý ngày thông minh
+const parseSmartDate = (input: string): string => {
+  if (!input) return "";
+  
+  // Nếu input đã là định dạng YYYY-MM-DD
+  if (input.match(/^\d{4}-\d{2}-\d{2}$/)) return input;
+
+  const cleanInput = input.replace(/\D/g, '/'); // Thay ký tự đặc biệt bằng /
+  const parts = cleanInput.split('/').filter(Boolean);
+  const currentYear = new Date().getFullYear();
+
+  let day, month, year = currentYear;
+
+  // Trường hợp nhập dính liền: 134 -> 13/04, 1304 -> 13/04
+  if (parts.length === 1) {
+    const text = parts[0];
+    if (text.length === 3) {
+      day = parseInt(text.substring(0, 2));
+      month = parseInt(text.substring(2, 3));
+    } else if (text.length === 4) {
+      day = parseInt(text.substring(0, 2));
+      month = parseInt(text.substring(2, 4));
+    } else if (text.length >= 6) { // 130424
+      day = parseInt(text.substring(0, 2));
+      month = parseInt(text.substring(2, 4));
+      const yearStr = text.substring(4);
+      year = parseInt(yearStr.length === 2 ? '20' + yearStr : yearStr);
+    } else {
+        return input; 
+    }
+  } else {
+    // Trường hợp có dấu cách: 13/4, 13 4
+    day = parseInt(parts[0]);
+    month = parseInt(parts[1] || new Date().getMonth() + 1 + "");
+    if (parts[2]) {
+      year = parseInt(parts[2].length === 2 ? '20' + parts[2] : parts[2]);
+    }
+  }
+
+  // Validate
+  if (day > 31 || day < 1 || month > 12 || month < 1) return input;
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+const formatDateDisplay = (isoDate: string) => {
+  if (!isoDate) return "";
+  const [y, m, d] = isoDate.split('-');
+  return `${d}/${m}`;
+}
 
 const TASK_COLORS = [
   { name: 'Indigo', value: '#6366f1' },
@@ -67,27 +117,40 @@ const INITIAL_PROJECTS: Project[] = [
     ],
     paymentStatus: PaymentStatus.PENDING,
     createdAt: new Date().toISOString(),
-    isUrgent: true
+    isUrgent: true,
+    type: 'complex'
   }
 ];
 
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem('ff_projects_v7');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+    try {
+        const saved = localStorage.getItem('ff_projects_v9');
+        return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
+    } catch (e) {
+        return INITIAL_PROJECTS;
+    }
   });
-  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('ff_theme') === 'dark');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+      try {
+          return localStorage.getItem('ff_theme') === 'dark';
+      } catch (e) {
+          return false;
+      }
+  });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
+  
+  // Create Project States
   const [isAddingProject, setIsAddingProject] = useState(false);
-  const [creationMode, setCreationMode] = useState<'manual' | 'ai'>('ai');
-  const [aiAdvice, setAiAdvice] = useState<string>('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isParsingTasks, setIsParsingTasks] = useState(false);
+  const [projectType, setProjectType] = useState<'single' | 'complex'>('single');
   const [formDeadline, setFormDeadline] = useState('');
+  const [tempTasks, setTempTasks] = useState<Task[]>([]);
+  const [smartInput, setSmartInput] = useState('');
+  const [complexBudget, setComplexBudget] = useState<number>(0);
 
   useEffect(() => {
-    localStorage.setItem('ff_projects_v7', JSON.stringify(projects));
+    localStorage.setItem('ff_projects_v9', JSON.stringify(projects));
   }, [projects]);
 
   useEffect(() => {
@@ -95,6 +158,36 @@ const App: React.FC = () => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
+
+  // Reset modal state when opening
+  useEffect(() => {
+    if (isAddingProject) {
+        setProjectType('single');
+        setTempTasks([]);
+        setFormDeadline('');
+        setSmartInput('');
+        setComplexBudget(0);
+    }
+  }, [isAddingProject]);
+
+  // Auto-calculate budget and deadline for Complex Projects
+  useEffect(() => {
+    if (projectType === 'complex' && tempTasks.length > 0) {
+        // Auto Budget: Sum of tasks
+        const totalTaskBudget = tempTasks.reduce((acc, t) => acc + (t.budget || 0), 0);
+        setComplexBudget(totalTaskBudget);
+
+        // Auto Deadline: Max date
+        const validDates = tempTasks
+            .map(t => new Date(t.dueDate).getTime())
+            .filter(d => !isNaN(d));
+        
+        if (validDates.length > 0) {
+            const maxDate = new Date(Math.max(...validDates));
+            setFormDeadline(maxDate.toISOString().split('T')[0]);
+        }
+    }
+  }, [tempTasks, projectType]);
 
   const stats = useMemo(() => {
     const totalEarned = projects.filter(p => p.paymentStatus === PaymentStatus.PAID).reduce((sum, p) => sum + p.budget, 0);
@@ -145,40 +238,52 @@ const App: React.FC = () => {
     setProjects(projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, newTask] } : p));
   };
 
-  const handleSmartTasksBlur = async (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    if (text.trim() && creationMode === 'ai') {
-      setIsParsingTasks(true);
-      const aiTasks = await parseTasksFromText(text);
-      if (aiTasks.length > 0) {
-        const dates = aiTasks.map(t => new Date(t.dueDate || '').getTime()).filter(d => !isNaN(d));
-        if (dates.length > 0) {
-          const latest = new Date(Math.max(...dates));
-          setFormDeadline(latest.toISOString().split('T')[0]);
-        }
+  const handleSmartInputAdd = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && smartInput.trim()) {
+          e.preventDefault();
+          
+          // Regex to split "Title - Date"
+          // Looks for the last hyphen surrounded by spaces, or just a hyphen if users are lazy
+          let title = smartInput;
+          let dateStr = "";
+          let budget = 0;
+
+          // Check for hyphen to split Title and Date
+          const lastHyphen = smartInput.lastIndexOf('-');
+          
+          if (lastHyphen !== -1) {
+             title = smartInput.substring(0, lastHyphen).trim();
+             dateStr = smartInput.substring(lastHyphen + 1).trim();
+          }
+
+          const parsedDate = parseSmartDate(dateStr) || new Date().toISOString().split('T')[0];
+
+          const newTask: Task = {
+              id: Math.random().toString(36).substr(2, 9),
+              title: title,
+              dueDate: parsedDate,
+              completed: false,
+              color: TASK_COLORS[tempTasks.length % TASK_COLORS.length].value,
+              budget: budget
+          };
+
+          setTempTasks([...tempTasks, newTask]);
+          setSmartInput('');
       }
-      setIsParsingTasks(false);
-    }
   };
 
   const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
-    let parsedTasks: Task[] = [];
-    if (creationMode === 'ai') {
-      const rawTasks = formData.get('smartTasks') as string;
-      setIsParsingTasks(true);
-      const aiTasks = await parseTasksFromText(rawTasks);
-      parsedTasks = aiTasks.map((t, idx) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        title: t.title || 'Công việc không tên',
-        dueDate: t.dueDate || new Date().toISOString().split('T')[0],
-        completed: false,
-        color: TASK_COLORS[idx % TASK_COLORS.length].value
-      }));
-      setIsParsingTasks(false);
+    let deadline = formDeadline;
+    // Fallback if empty in Single mode
+    if (projectType === 'single' && !deadline) {
+        let rawDeadline = formData.get('deadline') as string;
+        deadline = parseSmartDate(rawDeadline) || new Date().toISOString().split('T')[0];
     }
+
+    const budget = projectType === 'complex' ? complexBudget : Number(formData.get('budget'));
 
     const newProject: Project = {
       id: Math.random().toString(36).substr(2, 9),
@@ -186,17 +291,17 @@ const App: React.FC = () => {
       projectName: formData.get('projectName') as string,
       description: (formData.get('description') as string) || '',
       status: ProjectStatus.PLANNING,
-      deadline: formDeadline || (formData.get('deadline') as string) || new Date().toISOString().split('T')[0],
-      budget: Number(formData.get('budget')),
-      tasks: parsedTasks,
+      deadline: deadline,
+      budget: budget,
+      tasks: projectType === 'complex' ? tempTasks : [],
       paymentStatus: PaymentStatus.PENDING,
       createdAt: new Date().toISOString(),
-      isUrgent: formData.get('isUrgent') === 'on'
+      isUrgent: formData.get('isUrgent') === 'on',
+      type: projectType
     };
     
     setProjects([...projects, newProject]);
     setIsAddingProject(false);
-    setFormDeadline('');
   };
 
   const filteredProjects = projects.filter(p => {
@@ -228,16 +333,6 @@ const App: React.FC = () => {
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án & Task" />
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" />
         </nav>
-
-        <div className="mt-auto">
-          <div className={`p-6 rounded-[2rem] text-white shadow-xl ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-slate-900'}`}>
-            <div className="flex items-center gap-2 mb-3 opacity-90"><BrainCircuit size={18} className="text-indigo-400" /><span className="text-[10px] font-bold uppercase tracking-widest">Trợ lý Chiến lược</span></div>
-            <p className="text-sm font-medium leading-relaxed mb-4 text-slate-300">Tư vấn ưu tiên & dòng tiền.</p>
-            <button onClick={async () => { setIsAiLoading(true); const advice = await getWorkloadAdvice(projects); setAiAdvice(advice); setIsAiLoading(false); }} disabled={isAiLoading} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
-              {isAiLoading ? <Loader2 className="animate-spin w-3 h-3" /> : 'Phân tích'}
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* Main Content */}
@@ -252,19 +347,6 @@ const App: React.FC = () => {
             Dự án mới
           </button>
         </header>
-
-        {aiAdvice && (
-          <div className={`mb-10 p-6 border shadow-sm rounded-[2rem] relative overflow-hidden transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-            <div className="flex gap-5">
-              <div className="bg-indigo-600 p-3.5 rounded-2xl text-white h-fit shadow-lg shadow-indigo-500/20"><BrainCircuit size={24} /></div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold mb-2">Tư vấn AI</h3>
-                <p className={`text-sm leading-relaxed whitespace-pre-line mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{aiAdvice}</p>
-                <button onClick={() => setAiAdvice('')} className="text-xs font-bold text-indigo-500 hover:text-indigo-400 uppercase tracking-widest">Đã ghi nhận</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === 'dashboard' && (
           <div className="space-y-10">
@@ -300,7 +382,7 @@ const App: React.FC = () => {
                 <div className="space-y-4 flex-1 overflow-y-auto">
                   {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()).slice(0, 5).map(p => (
                     <div key={p.id} className={`flex items-center justify-between p-4 rounded-2xl border ${isDarkMode ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/50 border-orange-100'}`}>
-                      <div><h4 className="font-bold text-sm">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {new Date(p.deadline).toLocaleDateString('vi-VN')}</p></div>
+                      <div><h4 className="font-bold text-sm">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {formatDateDisplay(p.deadline)}</p></div>
                     </div>
                   ))}
                   {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).length === 0 && <p className="text-xs text-slate-500 italic text-center py-10">Không có việc gấp nào.</p>}
@@ -382,9 +464,22 @@ const App: React.FC = () => {
           <div className={`rounded-[3rem] w-full max-w-2xl p-12 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-slate-900 text-slate-100 border border-slate-800' : 'bg-white text-slate-900'}`}>
             <h2 className="text-3xl font-black mb-6 tracking-tight">Thêm dự án mới</h2>
             
+            {/* Segmentation Button */}
             <div className={`flex p-1.5 rounded-2xl w-full mb-8 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-              <button onClick={() => setCreationMode('ai')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${creationMode === 'ai' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}><Sparkles size={16}/> Smart AI</button>
-              <button onClick={() => setCreationMode('manual')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${creationMode === 'manual' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}><Edit2 size={16}/> Thủ công</button>
+                <button 
+                    type="button" 
+                    onClick={() => setProjectType('single')} 
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === 'single' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                >
+                    <FileType size={16}/> Dự án lẻ
+                </button>
+                <button 
+                    type="button" 
+                    onClick={() => setProjectType('complex')} 
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === 'complex' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                >
+                    <Layers size={16}/> Dự án lớn
+                </button>
             </div>
 
             <form onSubmit={handleCreateProject} className="space-y-6">
@@ -393,25 +488,97 @@ const App: React.FC = () => {
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Khách hàng</label><input required name="clientName" type="text" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="VD: Agency X" /></div>
               </div>
               
-              {creationMode === 'ai' ? (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">Gõ danh sách task để AI lọc ngày</label>
-                  <textarea name="smartTasks" onBlur={handleSmartTasksBlur} className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-medium h-32 ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="20/2 Design Banner, 25/2 Feedback, 1/3 Final..." />
+              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả dự án</label><textarea name="description" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-medium h-24 ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="Chi tiết..." /></div>
+
+              {projectType === 'complex' ? (
+                // Complex Mode UI
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                    <div className={`p-6 rounded-3xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-indigo-50/50 border-indigo-200'}`}>
+                        <div className="flex items-center justify-between mb-4">
+                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5"><Layers size={14}/> Các hạng mục (Tasks)</label>
+                            <span className="text-[10px] font-bold text-slate-400">Gõ: "Tên - 1204" để thêm nhanh</span>
+                        </div>
+                        
+                        <div className="flex gap-2 mb-4">
+                            <input 
+                                value={smartInput}
+                                onChange={(e) => setSmartInput(e.target.value)}
+                                onKeyDown={handleSmartInputAdd}
+                                placeholder="VD: Banner Facebook - 1504 (Enter để thêm)"
+                                className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold border-2 outline-none ${isDarkMode ? 'bg-slate-900 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-200 focus:border-indigo-500'}`}
+                            />
+                            <button type="button" onClick={() => handleSmartInputAdd({ key: 'Enter', preventDefault: () => {} } as any)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold"><Plus size={20}/></button>
+                        </div>
+
+                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            {tempTasks.map((t, idx) => (
+                                <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'}`}>
+                                    <div className="flex-1">
+                                        <p className="font-bold text-sm">{t.title}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400"><Calendar size={10}/> {formatDateDisplay(t.dueDate)}</span>
+                                            <input 
+                                                type="number" 
+                                                placeholder="Budget..." 
+                                                value={t.budget || ''} 
+                                                onChange={(e) => {
+                                                    const newBudget = Number(e.target.value);
+                                                    const newTasks = [...tempTasks];
+                                                    newTasks[idx].budget = newBudget;
+                                                    setTempTasks(newTasks);
+                                                }}
+                                                className={`w-24 text-[10px] font-bold bg-transparent border-b border-dashed outline-none ${isDarkMode ? 'border-slate-600 placeholder:text-slate-600' : 'border-slate-300 placeholder:text-slate-400'}`}
+                                            />
+                                        </div>
+                                    </div>
+                                    <button type="button" onClick={() => setTempTasks(tempTasks.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
+                                </div>
+                            ))}
+                            {tempTasks.length === 0 && <p className="text-center text-xs text-slate-400 py-4 italic">Chưa có task nào.</p>}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                         <div className="opacity-70 pointer-events-none">
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline (Auto)</label>
+                             <div className={`mt-2 font-black text-lg ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{formDeadline ? formatDateDisplay(formDeadline) : '--/--'}</div>
+                         </div>
+                         <div>
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng Budget (VNĐ)</label>
+                             <input 
+                                value={complexBudget} 
+                                onChange={(e) => setComplexBudget(Number(e.target.value))} 
+                                type="number" 
+                                className={`w-full mt-1 px-4 py-3 rounded-2xl outline-none border-2 transition-all font-black text-lg ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} 
+                             />
+                             <p className="text-[10px] text-slate-500 mt-1">*Tự động cộng từ task con</p>
+                         </div>
+                    </div>
                 </div>
               ) : (
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả dự án</label><textarea name="description" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-medium h-24 ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="Chi tiết..." /></div>
+                // Single Mode UI
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline (Gõ tắt: 134 = 13/4)</label>
+                        <input 
+                            name="deadline" 
+                            type="text" 
+                            placeholder="VD: 134, 1304, 13/4"
+                            value={formDeadline} 
+                            onChange={(e) => setFormDeadline(e.target.value)} 
+                            onBlur={(e) => setFormDeadline(parseSmartDate(e.target.value))}
+                            className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-indigo-50/50 border-indigo-100 focus:border-indigo-500 text-indigo-700'}`} 
+                        />
+                    </div>
+                    <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget (VNĐ)</label><input required name="budget" type="number" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-black ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="0" /></div>
+                </div>
               )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline {creationMode === 'ai' && '(AI Auto)'}</label><input required name="deadline" type="date" value={formDeadline} onChange={(e) => setFormDeadline(e.target.value)} className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-indigo-50/50 border-indigo-100 focus:border-indigo-500 text-indigo-700'}`} /></div>
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget (VNĐ)</label><input required name="budget" type="number" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-black ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="0" /></div>
-              </div>
 
               <div className="flex items-center gap-3 py-2"><input type="checkbox" name="isUrgent" id="isUrgent" className="w-6 h-6 rounded-lg text-orange-500 focus:ring-orange-500" /><label htmlFor="isUrgent" className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5"><Flame size={16} />Dự án này đang GẤP</label></div>
 
               <div className="flex gap-4 pt-8">
                 <button type="button" onClick={() => setIsAddingProject(false)} className={`flex-1 py-5 font-bold rounded-2xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Hủy</button>
-                <button type="submit" disabled={isParsingTasks} className="flex-[2] py-5 font-black text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-3">{isParsingTasks ? <Loader2 className="animate-spin" size={24} /> : <><CheckCircle2 size={24} />Tạo dự án</>}</button>
+                <button type="submit" className="flex-[2] py-5 font-black text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-3"><CheckCircle2 size={24} />Tạo dự án</button>
               </div>
             </form>
           </div>
@@ -460,6 +627,12 @@ const ProjectCard: React.FC<{
       setQuickTaskTitle('');
     }
   };
+
+  // Smart Date input handler for task editing
+  const handleTaskDateBlur = (tid: string, value: string) => {
+      const parsed = parseSmartDate(value);
+      if(parsed) onUpdateTask(tid, { dueDate: parsed });
+  }
   
   return (
     <div className={`rounded-[2.5rem] border p-8 flex flex-col hover:shadow-2xl transition-all group relative ${isDarkMode ? 'bg-slate-900 hover:shadow-indigo-500/5' : 'bg-white hover:shadow-slate-100'} ${project.isUrgent ? 'border-orange-500/30' : (isDarkMode ? 'border-slate-800' : 'border-slate-100')}`}>
@@ -471,6 +644,7 @@ const ProjectCard: React.FC<{
             <select value={project.status} onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })} className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none border-none cursor-pointer ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500/10 text-emerald-500' : project.status === ProjectStatus.IN_PROGRESS ? 'bg-indigo-500/10 text-indigo-500' : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>
               {Object.values(ProjectStatus).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            {project.type === 'complex' && <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-1 rounded-full dark:bg-slate-800">DỰ ÁN LỚN</span>}
           </div>
           <h3 className="text-2xl font-black leading-tight group-hover:text-indigo-500 transition-colors">{project.projectName}</h3><p className="text-sm font-bold text-slate-500 mt-1">{project.clientName}</p>
         </div>
@@ -498,12 +672,24 @@ const ProjectCard: React.FC<{
               {editingTaskId === task.id ? (
                 <div className="flex flex-col gap-2">
                   <input autoFocus value={task.title} onChange={(e) => onUpdateTask(task.id, { title: e.target.value })} className={`w-full text-sm font-bold border-none rounded p-1 outline-none ring-1 ring-indigo-500 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`} />
-                  <input type="date" value={task.dueDate} onChange={(e) => onUpdateTask(task.id, { dueDate: e.target.value })} className={`w-full text-[10px] font-bold border-none rounded p-1 outline-none ring-1 ring-indigo-200 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`} />
+                  <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase">Deadline:</span>
+                      <input 
+                        type="text" 
+                        placeholder="VD: 134, 13/4"
+                        defaultValue={task.dueDate} // Use defaultValue so user can edit raw text
+                        onBlur={(e) => handleTaskDateBlur(task.id, e.target.value)}
+                        className={`w-24 text-[10px] font-bold border-none rounded p-1 outline-none ring-1 ring-indigo-200 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`} 
+                      />
+                  </div>
                 </div>
               ) : (
                 <div onClick={() => setEditingTaskId(task.id)} className="cursor-pointer">
-                  <p className={`text-sm font-bold truncate ${task.completed ? 'text-slate-500 line-through opacity-50' : ''}`}>{task.title}</p>
-                  <div className="flex items-center gap-1 mt-0.5"><Clock size={10} className="text-slate-500" /><p className="text-[10px] font-bold text-slate-500">{new Date(task.dueDate).toLocaleDateString('vi-VN')}</p></div>
+                  <div className="flex justify-between items-start">
+                    <p className={`text-sm font-bold truncate ${task.completed ? 'text-slate-500 line-through opacity-50' : ''}`}>{task.title}</p>
+                    {task.budget && <span className="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-1.5 py-0.5 rounded ml-2 dark:bg-emerald-500/10">{formatVND(task.budget)}</span>}
+                  </div>
+                  <div className="flex items-center gap-1 mt-0.5"><Clock size={10} className="text-slate-500" /><p className="text-[10px] font-bold text-slate-500">{formatDateDisplay(task.dueDate)}</p></div>
                 </div>
               )}
             </div>
@@ -534,7 +720,7 @@ const ProjectCard: React.FC<{
       <div className={`pt-8 border-t mt-auto flex justify-between items-end ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
         <div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Hạn cuối</p>
-          <div className={`flex items-center gap-2 text-sm font-black px-3 py-1.5 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><Calendar size={16} className="text-indigo-500" />{new Date(project.deadline).toLocaleDateString('vi-VN')}</div>
+          <div className={`flex items-center gap-2 text-sm font-black px-3 py-1.5 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}><Calendar size={16} className="text-indigo-500" />{formatDateDisplay(project.deadline)}</div>
         </div>
         <div className="text-right">
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Budget</p>

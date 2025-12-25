@@ -19,6 +19,7 @@ export interface Task {
   dueDate: string;
   completed: boolean;
   color?: string;
+  budget?: number; // Added budget specific to task
 }
 
 export interface Project {
@@ -33,6 +34,7 @@ export interface Project {
   paymentStatus: PaymentStatus;
   createdAt: string;
   isUrgent?: boolean;
+  type?: 'single' | 'complex'; // To distinguish UI rendering if needed
 }
 
 export interface FinanceRecord {
