@@ -27,7 +27,11 @@ import {
   FileType,
   Building2,
   Check,
-  TrendingUp
+  TrendingUp,
+  CreditCard,
+  FileSpreadsheet,
+  RefreshCw,
+  Link as LinkIcon
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -246,6 +250,26 @@ const ProjectCard: React.FC<{
     }
   };
 
+  const getStatusColorClass = (status: ProjectStatus) => {
+    switch (status) {
+      case ProjectStatus.COMPLETED: return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case ProjectStatus.IN_PROGRESS: return 'bg-blue-100 text-blue-600 border-blue-200';
+      case ProjectStatus.PLANNING: return 'bg-slate-100 text-slate-600 border-slate-200';
+      case ProjectStatus.REVIEW: return 'bg-purple-100 text-purple-600 border-purple-200';
+      case ProjectStatus.ON_HOLD: return 'bg-amber-100 text-amber-600 border-amber-200';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
+  const getPaymentColorClass = (status: PaymentStatus) => {
+    switch (status) {
+      case PaymentStatus.PAID: return 'bg-emerald-100 text-emerald-600 border-emerald-200';
+      case PaymentStatus.PENDING: return 'bg-orange-100 text-orange-600 border-orange-200';
+      case PaymentStatus.OVERDUE: return 'bg-red-100 text-red-600 border-red-200';
+      default: return 'bg-slate-100 text-slate-600';
+    }
+  };
+
   return (
     <div className={`group relative p-6 rounded-[2.5rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
       <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
@@ -253,14 +277,34 @@ const ProjectCard: React.FC<{
       </div>
 
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-           <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${project.isUrgent ? 'bg-orange-500 text-white' : (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
-             {project.isUrgent ? 'Urgent' : 'Normal'}
-           </span>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+           {/* Project Status Dropdown */}
+           <div className="relative">
+             <select 
+                value={project.status}
+                onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })}
+                className={`appearance-none pl-3 pr-7 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer outline-none transition-colors ${getStatusColorClass(project.status)}`}
+             >
+                {Object.values(ProjectStatus).map(s => <option key={s} value={s}>{s}</option>)}
+             </select>
+             <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+           </div>
+
+           {/* Client Badge */}
            <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-500" style={{backgroundColor: project.clientColor ? `${project.clientColor}20` : undefined, color: project.clientColor}}>
              {project.clientName}
            </span>
+
+           {/* Urgent Toggle (Small Icon) */}
+           <button 
+             onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })}
+             className={`p-1 rounded-md transition-colors ${project.isUrgent ? 'text-orange-500 bg-orange-100' : 'text-slate-300 hover:text-orange-300'}`}
+             title="Toggle Urgent"
+           >
+             <Flame size={14} fill={project.isUrgent ? "currentColor" : "none"} />
+           </button>
         </div>
+        
         <h3 className="text-xl font-black mb-1 line-clamp-1" title={project.projectName}>{project.projectName}</h3>
         <p className="text-sm text-slate-400 font-medium line-clamp-2 h-10">{project.description || 'Không có mô tả'}</p>
       </div>
@@ -268,7 +312,21 @@ const ProjectCard: React.FC<{
       <div className="space-y-4 mb-6">
         <div className="flex items-center justify-between text-xs font-bold text-slate-400">
            <span className="flex items-center gap-1"><Calendar size={14}/> {formatDateDisplay(project.deadline)}</span>
-           <span className="flex items-center gap-1"><Banknote size={14}/> {formatVND(project.budget)}</span>
+           <div className="flex items-center gap-2">
+               <span className="flex items-center gap-1"><Banknote size={14}/> {formatVND(project.budget)}</span>
+               
+               {/* Payment Status Dropdown */}
+               <div className="relative">
+                 <select 
+                    value={project.paymentStatus}
+                    onChange={(e) => onUpdateProject({ paymentStatus: e.target.value as PaymentStatus })}
+                    className={`appearance-none pl-2 pr-6 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border cursor-pointer outline-none transition-colors ${getPaymentColorClass(project.paymentStatus)}`}
+                 >
+                    {Object.values(PaymentStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                 </select>
+                 <ChevronDown size={8} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+               </div>
+           </div>
         </div>
         
         <div className="space-y-1.5">
@@ -345,6 +403,10 @@ const App: React.FC = () => {
       }
   });
 
+  const [sheetWebhookUrl, setSheetWebhookUrl] = useState(() => {
+      return localStorage.getItem('ff_sheet_url') || '';
+  });
+
   // UI State
   const [isDarkMode, setIsDarkMode] = useState(() => {
       try {
@@ -355,6 +417,8 @@ const App: React.FC = () => {
   });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [showSheetConfig, setShowSheetConfig] = useState(false);
   
   // Creation Modal State
   const [isAddingProject, setIsAddingProject] = useState(false);
@@ -391,6 +455,10 @@ const App: React.FC = () => {
     if (isDarkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
+
+  useEffect(() => {
+      localStorage.setItem('ff_sheet_url', sheetWebhookUrl);
+  }, [sheetWebhookUrl]);
 
   // Click outside to close client dropdown
   useEffect(() => {
@@ -537,6 +605,42 @@ const App: React.FC = () => {
       }
   };
 
+  const handleSyncToSheet = async () => {
+      if (!sheetWebhookUrl) {
+          setShowSheetConfig(true);
+          return;
+      }
+
+      setIsSyncing(true);
+      try {
+          // Prepare payload data: Only send essential finance data
+          const payload = projects.map(p => ({
+              date: new Date(p.createdAt).toLocaleDateString('vi-VN'),
+              client: p.clientName,
+              project: p.projectName,
+              budget: p.budget,
+              status: p.paymentStatus,
+              deadline: formatDateDisplay(p.deadline)
+          }));
+
+          await fetch(sheetWebhookUrl, {
+              method: 'POST',
+              mode: 'no-cors', // Google Scripts often require no-cors for simple webhooks
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload)
+          });
+          
+          alert('Đã gửi dữ liệu Sync thành công! (Lưu ý: Do Google App Script, có thể mất vài giây để sheet cập nhật)');
+      } catch (error) {
+          console.error("Sync Error", error);
+          alert('Có lỗi khi Sync. Vui lòng kiểm tra lại URL Script.');
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
   const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -675,7 +779,7 @@ const App: React.FC = () => {
 
         {activeTab === 'projects' && (
           <div className="space-y-8">
-            <div className={`flex p-1.5 rounded-2xl w-fit ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-2xl w-full ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
               <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'all'} onClick={() => setProjectFilter('all')} label="Tất cả" />
               <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'urgent'} onClick={() => setProjectFilter('urgent')} label="Gấp" />
               <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Đang làm" />
@@ -795,46 +899,100 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'finance' && (
-          <div className={`rounded-[2.5rem] border shadow-sm overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-            <div className={`p-10 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
-              <h3 className="text-2xl font-black">Thu nhập</h3>
-              <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đã thực nhận</p>
-                <p className="text-4xl font-black text-emerald-500 tracking-tighter">{formatVND(stats.totalEarned)}</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className={`text-[11px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-                    <th className="px-10 py-6">Công ty</th>
-                    <th className="px-10 py-6">Dự án</th>
-                    <th className="px-10 py-6">Budget</th>
-                    <th className="px-10 py-6 text-center">Trạng thái</th>
-                    <th className="px-10 py-6 text-right">Ngày nhận</th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
-                  {projects.map(p => (
-                    <tr key={p.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
-                      <td className="px-10 py-6 font-bold text-sm">
-                          <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
-                      </td>
-                      <td className="px-10 py-6 font-bold">{p.projectName}</td>
-                      <td className="px-10 py-6 font-mono font-bold">{formatVND(p.budget)}</td>
-                      <td className="px-10 py-6 text-center">
-                        <button 
-                          onClick={() => updateProject(p.id, { paymentStatus: p.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} 
-                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
-                        >
-                          {p.paymentStatus}
-                        </button>
-                      </td>
-                      <td className="px-10 py-6 text-sm text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+          <div className="space-y-6">
+             {/* Sheet Configuration Panel */}
+             <div className={`p-6 rounded-[2rem] border shadow-sm transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                 <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-4">
+                         <div className="p-3 bg-green-100 text-green-600 rounded-xl"><FileSpreadsheet size={24}/></div>
+                         <div>
+                             <h4 className="font-black text-lg">Google Sheets Sync</h4>
+                             <p className="text-xs text-slate-400 font-medium">Đồng bộ dữ liệu thanh toán lên Sheet của bạn</p>
+                         </div>
+                     </div>
+                     <div className="flex gap-2">
+                        {sheetWebhookUrl ? (
+                            <button 
+                                onClick={handleSyncToSheet} 
+                                disabled={isSyncing}
+                                className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isSyncing ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>}
+                                {isSyncing ? 'Đang Sync...' : 'Sync Ngay'}
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={() => setShowSheetConfig(!showSheetConfig)} 
+                                className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                            >
+                                <LinkIcon size={18}/> Liên kết Sheet
+                            </button>
+                        )}
+                        {sheetWebhookUrl && (
+                             <button onClick={() => setShowSheetConfig(!showSheetConfig)} className="p-3 text-slate-400 hover:text-slate-600"><Edit2 size={18}/></button>
+                        )}
+                     </div>
+                 </div>
+
+                 {showSheetConfig && (
+                     <div className="mt-6 pt-6 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
+                         <div className="space-y-3">
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google App Script Web App URL</label>
+                             <input 
+                                value={sheetWebhookUrl}
+                                onChange={(e) => setSheetWebhookUrl(e.target.value)}
+                                placeholder="https://script.google.com/macros/s/..."
+                                className={`w-full px-4 py-3 rounded-xl border-2 outline-none font-medium text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                             />
+                             <p className="text-[10px] text-slate-400">
+                                 *Cách tạo: Mở Sheet {'>'} Extensions {'>'} Apps Script. Paste code xử lý `doPost`. Deploy as Web App (Who has access: Anyone). Copy URL dán vào đây.
+                             </p>
+                         </div>
+                     </div>
+                 )}
+             </div>
+
+            <div className={`rounded-[2.5rem] border shadow-sm overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <div className={`p-10 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
+                <h3 className="text-2xl font-black">Thu nhập</h3>
+                <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đã thực nhận</p>
+                    <p className="text-4xl font-black text-emerald-500 tracking-tighter">{formatVND(stats.totalEarned)}</p>
+                </div>
+                </div>
+                <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                    <tr className={`text-[11px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
+                        <th className="px-10 py-6">Công ty</th>
+                        <th className="px-10 py-6">Dự án</th>
+                        <th className="px-10 py-6">Budget</th>
+                        <th className="px-10 py-6 text-center">Trạng thái</th>
+                        <th className="px-10 py-6 text-right">Ngày nhận</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
+                    {projects.map(p => (
+                        <tr key={p.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
+                        <td className="px-10 py-6 font-bold text-sm">
+                            <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
+                        </td>
+                        <td className="px-10 py-6 font-bold">{p.projectName}</td>
+                        <td className="px-10 py-6 font-mono font-bold">{formatVND(p.budget)}</td>
+                        <td className="px-10 py-6 text-center">
+                            <button 
+                            onClick={() => updateProject(p.id, { paymentStatus: p.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} 
+                            className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
+                            >
+                            {p.paymentStatus}
+                            </button>
+                        </td>
+                        <td className="px-10 py-6 text-sm text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+                </div>
             </div>
           </div>
         )}
