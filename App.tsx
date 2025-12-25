@@ -38,7 +38,13 @@ import {
   MessageSquare,
   FileText,
   Printer,
-  Filter
+  Filter,
+  MoreHorizontal,
+  PieChart,
+  RotateCcw,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ArrowRight
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -114,6 +120,17 @@ const formatDateDisplay = (isoDate: string) => {
   const [y, m, d] = isoDate.split('-');
   return `${d}/${m}`;
 }
+
+// Hàm tính toán deadline dự án dựa trên task con
+const calculateProjectDeadline = (tasks: Task[], currentDeadline: string): string => {
+    if (!tasks || tasks.length === 0) return currentDeadline;
+    const timestamps = tasks.map(t => new Date(t.dueDate).getTime()).filter(n => !isNaN(n));
+    if (timestamps.length === 0) return currentDeadline;
+    const maxTs = Math.max(...timestamps);
+    
+    // Nếu deadline hiện tại nhỏ hơn max task deadline, thì update. 
+    return new Date(maxTs).toISOString().split('T')[0];
+};
 
 const generateInvoiceHTML = (project: Project) => {
   const date = new Date().toLocaleDateString('vi-VN');
@@ -251,11 +268,11 @@ const PASTEL_PALETTE = [
 ];
 
 const AI_SUGGESTIONS = [
-  "Viết email nhắc thanh toán nhẹ nhàng, lịch sự cho khách hàng này.",
-  "Viết email đòi nợ gắt hơn vì đã quá hạn 1 tuần.",
-  "Tóm tắt tiến độ dự án này để báo cáo cho khách hàng.",
-  "Phân tích rủi ro của dự án dựa trên các task chưa hoàn thành.",
-  "Đề xuất lộ trình làm việc cho tuần tới để kịp deadline."
+  "Phân tích tổng doanh thu và xu hướng thu nhập tháng này.",
+  "Đánh giá hiệu quả của các dự án đang chạy (Active).",
+  "Lập kế hoạch chi tiêu dựa trên dòng tiền sắp về.",
+  "Dự báo doanh thu tháng sau dựa trên các deal đang pending.",
+  "So sánh tỷ suất lợi nhuận giữa các khách hàng khác nhau."
 ];
 
 // Changed to empty array to start fresh as requested
@@ -309,19 +326,21 @@ const NavItem: React.FC<{
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
-}> = ({ isDarkMode, active, onClick, icon, label }) => (
+  isCollapsed: boolean;
+}> = ({ isDarkMode, active, onClick, icon, label, isCollapsed }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-medium ${
+    title={isCollapsed ? label : ''}
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm group relative ${
       active
-        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30'
+        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
         : isDarkMode
         ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
         : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
-    }`}
+    } ${isCollapsed ? 'justify-center w-12 mx-auto px-0' : 'w-full'}`}
   >
-    {icon}
-    <span>{label}</span>
+    <div className="transition-transform duration-300 group-hover:scale-110">{icon}</div>
+    {!isCollapsed && <span className="animate-in fade-in duration-300 slide-in-from-left-2 whitespace-nowrap">{label}</span>}
   </button>
 );
 
@@ -333,28 +352,28 @@ const DashboardCard: React.FC<{
   trend: string;
 }> = ({ isDarkMode, label, value, icon, trend }) => (
   <div
-    className={`p-6 rounded-[2rem] border shadow-sm transition-colors ${
-      isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'
+    className={`p-5 rounded-2xl border shadow-sm transition-all duration-300 hover:translate-y-[-4px] hover:shadow-lg ${
+      isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'
     }`}
   >
-    <div className="flex items-start justify-between mb-4">
+    <div className="flex items-start justify-between mb-3">
       <div
-        className={`p-3 rounded-2xl ${
+        className={`p-2.5 rounded-xl transition-colors duration-300 ${
           isDarkMode ? 'bg-slate-800' : 'bg-slate-50'
         }`}
       >
         {icon}
       </div>
       <span
-        className={`text-xs font-bold px-2 py-1 rounded-lg ${
+        className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider transition-colors duration-300 ${
           isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
         }`}
       >
         {trend}
       </span>
     </div>
-    <p className="text-slate-400 text-sm font-medium mb-1">{label}</p>
-    <h3 className="text-2xl font-black tracking-tight">{value}</h3>
+    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{label}</p>
+    <h3 className="text-xl font-black tracking-tight">{value}</h3>
   </div>
 );
 
@@ -366,11 +385,11 @@ const FilterButton: React.FC<{
 }> = ({ isDarkMode, active, onClick, label }) => (
   <button
     onClick={onClick}
-    className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
       active
         ? isDarkMode
-          ? 'bg-slate-700 text-white shadow-sm'
-          : 'bg-white text-slate-900 shadow-sm'
+          ? 'bg-slate-700 text-white shadow-sm scale-105'
+          : 'bg-white text-slate-900 shadow-sm scale-105'
         : 'text-slate-400 hover:text-slate-500'
     }`}
   >
@@ -378,7 +397,6 @@ const FilterButton: React.FC<{
   </button>
 );
 
-// New Component: TaskItem for Inline Editing
 const TaskItem: React.FC<{
   task: Task;
   isDarkMode: boolean;
@@ -388,7 +406,6 @@ const TaskItem: React.FC<{
   const [budgetStr, setBudgetStr] = useState(formatNumber(task.budget));
   const [titleStr, setTitleStr] = useState(task.title);
 
-  // Sync props to state
   useEffect(() => { setDateStr(formatDateDisplay(task.dueDate)); }, [task.dueDate]);
   useEffect(() => { setBudgetStr(formatNumber(task.budget)); }, [task.budget]);
   useEffect(() => { setTitleStr(task.title); }, [task.title]);
@@ -417,55 +434,54 @@ const TaskItem: React.FC<{
   }
 
   return (
-    <div className="flex items-start gap-3 group/task">
+    <div className={`flex items-center gap-3 py-2 px-1 rounded-lg transition-colors duration-200 group/item ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
          <button
             onClick={() => onUpdate({ completed: !task.completed })}
-            className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-700 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
+            className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors duration-300 ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white scale-110' : (isDarkMode ? 'border-slate-600 hover:border-emerald-500' : 'border-slate-300 hover:border-emerald-500')}`}
          >
-            {task.completed && <Check size={12} strokeWidth={4} />}
+            {task.completed && <Check size={10} strokeWidth={4} />}
          </button>
-         <div className="flex-1 min-w-0">
-            <input
-                value={titleStr}
-                onChange={(e) => setTitleStr(e.target.value)}
-                onBlur={handleTitleBlur}
-                className={`text-sm font-medium block w-full bg-transparent outline-none truncate ${task.completed ? 'text-slate-400 line-through' : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}`}
-            />
+         
+         <input
+            value={titleStr}
+            onChange={(e) => setTitleStr(e.target.value)}
+            onBlur={handleTitleBlur}
+            className={`text-xs font-medium block flex-1 bg-transparent outline-none truncate transition-colors duration-300 ${task.completed ? 'text-slate-400 line-through' : (isDarkMode ? 'text-slate-200' : 'text-slate-700')}`}
+         />
             
-            <div className="flex items-center gap-4 mt-1">
-                {/* Date Edit */}
-                <div className="flex items-center gap-1 group/date relative">
-                    <Clock size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
-                    <input
-                        value={dateStr}
-                        onChange={(e) => setDateStr(e.target.value)}
-                        onBlur={handleDateBlur}
-                        placeholder="dd/mm"
-                        className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-14 transition-all ${isDarkMode ? 'text-slate-400 border-slate-600 focus:border-indigo-500' : 'text-slate-400 border-slate-300 focus:border-indigo-500'}`}
-                    />
-                </div>
+         <div className="flex items-center gap-3">
+            {/* Date Edit */}
+            <div className="flex items-center gap-1 group/date relative opacity-60 hover:opacity-100 transition-opacity duration-200">
+                <Clock size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
+                <input
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    onBlur={handleDateBlur}
+                    placeholder="dd/mm"
+                    className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-10 text-right transition-all ${isDarkMode ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-300'}`}
+                />
+            </div>
 
-                {/* Budget Edit */}
-                <div className="flex items-center gap-1 group/budget relative">
-                    <Banknote size={10} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
-                    <input
-                        value={budgetStr}
-                        onChange={(e) => {
-                             const val = e.target.value.replace(/[^0-9]/g, '');
-                             setBudgetStr(formatNumber(val));
-                        }}
-                        onBlur={handleBudgetBlur}
-                        placeholder="Budget..."
-                        className={`text-[10px] font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-20 transition-all ${isDarkMode ? 'text-slate-400 border-slate-600 focus:border-indigo-500' : 'text-slate-400 border-slate-300 focus:border-indigo-500'}`}
-                    />
-                </div>
+            {/* Budget Edit */}
+            <div className="flex items-center gap-1 group/budget relative opacity-60 hover:opacity-100 transition-opacity duration-200">
+                <input
+                    value={budgetStr}
+                    onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setBudgetStr(formatNumber(val));
+                    }}
+                    onBlur={handleBudgetBlur}
+                    placeholder="0"
+                    className={`text-[10px] font-mono font-bold bg-transparent border-b border-transparent hover:border-dashed outline-none w-16 text-right transition-all ${isDarkMode ? 'text-slate-400 border-slate-600' : 'text-slate-500 border-slate-300'}`}
+                />
             </div>
          </div>
     </div>
   );
 }
 
-const ProjectCard: React.FC<{
+// Compact Horizontal Project Row Component
+const ProjectRow: React.FC<{
   isDarkMode: boolean;
   project: Project;
   onDelete: () => void;
@@ -505,141 +521,168 @@ const ProjectCard: React.FC<{
     }
   };
 
-  const getPaymentColorClass = (status: PaymentStatus) => {
-    switch (status) {
-      case PaymentStatus.PAID: return 'bg-emerald-100 text-emerald-600 border-emerald-200';
-      case PaymentStatus.PENDING: return 'bg-orange-100 text-orange-600 border-orange-200';
-      case PaymentStatus.OVERDUE: return 'bg-red-100 text-red-600 border-red-200';
-      default: return 'bg-slate-100 text-slate-600';
-    }
-  };
-
   return (
-    <div className={`group relative p-6 rounded-[2.5rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
-      <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-         {/* Invoice Button */}
-         <button 
-           onClick={() => onPrintInvoice(project)} 
-           className="p-2 bg-indigo-50 text-indigo-500 rounded-xl hover:bg-indigo-500 hover:text-white transition-colors"
-           title="Xuất hóa đơn PDF"
-         >
-           <FileText size={16}/>
-         </button>
-         <button onClick={() => onDelete()} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={16}/></button>
-      </div>
+    <div className={`group relative transition-all duration-300 rounded-2xl border ${isExpanded ? 'shadow-lg ring-1 ring-indigo-500/10' : 'shadow-sm hover:shadow-md hover:translate-y-[-2px]'} ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+        {/* Main Row Content */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 p-5">
+            
+            {/* Left: Info */}
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-1.5">
+                    {/* Updated Status Dropdown */}
+                    <div className="relative group/status">
+                        <select 
+                            value={project.status}
+                            onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })}
+                            className={`appearance-none pl-6 pr-6 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider cursor-pointer outline-none transition-colors border ${getStatusColorClass(project.status)}`}
+                        />
+                        <div className={`absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full transition-colors ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500' : 'bg-current opacity-50'}`} />
+                        <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 transition-transform group-hover/status:rotate-180" />
+                    </div>
 
-      <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-           {/* Project Status Dropdown */}
-           <div className="relative">
-             <select 
-                value={project.status}
-                onChange={(e) => onUpdateProject({ status: e.target.value as ProjectStatus })}
-                className={`appearance-none pl-3 pr-7 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border cursor-pointer outline-none transition-colors ${getStatusColorClass(project.status)}`}
-             >
-                {Object.values(ProjectStatus).map(s => <option key={s} value={s}>{s}</option>)}
-             </select>
-             <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
-           </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                        {project.clientName}
+                    </span>
+                    
+                    {/* Urgent Toggle Button */}
+                    <button 
+                        onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })}
+                        className={`p-1 rounded-md transition-all duration-300 ${project.isUrgent ? 'text-orange-500 bg-orange-100 scale-110' : 'text-slate-300 hover:text-orange-400 hover:scale-110'}`}
+                        title={project.isUrgent ? "Bỏ gấp" : "Đánh dấu Gấp"}
+                    >
+                        <Flame size={14} fill={project.isUrgent ? "currentColor" : "none"} />
+                    </button>
+                </div>
 
-           {/* Client Badge */}
-           <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-500" style={{backgroundColor: project.clientColor ? `${project.clientColor}20` : undefined, color: project.clientColor}}>
-             {project.clientName}
-           </span>
+                <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold truncate transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-400" title={project.projectName}>{project.projectName}</h3>
+                </div>
+            </div>
 
-           {/* Urgent Toggle (Small Icon) */}
-           <button 
-             onClick={() => onUpdateProject({ isUrgent: !project.isUrgent })}
-             className={`p-1 rounded-md transition-colors ${project.isUrgent ? 'text-orange-500 bg-orange-100' : 'text-slate-300 hover:text-orange-300'}`}
-             title="Toggle Urgent"
-           >
-             <Flame size={14} fill={project.isUrgent ? "currentColor" : "none"} />
-           </button>
+            {/* Middle: Stats */}
+            <div className="flex items-center gap-6 md:gap-10 w-full md:w-auto mt-2 md:mt-0">
+                
+                {/* Deadline */}
+                <div className="flex flex-col items-start md:items-end min-w-[80px]">
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Deadline</span>
+                    <span className={`text-xs font-bold flex items-center gap-1.5 transition-colors ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <Calendar size={12} className="opacity-50"/> {formatDateDisplay(project.deadline)}
+                    </span>
+                </div>
+
+                {/* Budget */}
+                <div className="flex flex-col items-start md:items-end min-w-[100px]">
+                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
+                        Budget 
+                        <select 
+                            value={project.paymentStatus}
+                            onChange={(e) => onUpdateProject({ paymentStatus: e.target.value as PaymentStatus })}
+                            className={`ml-1 bg-transparent outline-none cursor-pointer ${project.paymentStatus === 'Paid' ? 'text-emerald-500' : 'text-amber-500'}`}
+                        >
+                            <option value="Pending">Wait</option>
+                            <option value="Paid">Paid</option>
+                        </select>
+                    </span>
+                    <div className="flex items-center gap-1 group/input">
+                        {/* Budget Input: Read-only if type is complex */}
+                        <input
+                            type="text"
+                            value={localBudget}
+                            readOnly={project.type === 'complex'}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                setLocalBudget(formatNumber(val));
+                            }}
+                            onBlur={() => {
+                                const num = parseNumber(localBudget);
+                                if (num !== project.budget) {
+                                    onUpdateProject({ budget: num });
+                                }
+                            }}
+                            title={project.type === 'complex' ? "Tự động cộng từ task con" : "Nhập số tiền"}
+                            className={`w-full text-right bg-transparent border-b border-transparent hover:border-dashed outline-none font-mono font-bold text-sm transition-colors ${isDarkMode ? 'text-slate-200 border-slate-700' : 'text-slate-700 border-slate-300'} ${project.type === 'complex' ? 'cursor-default opacity-80' : ''}`}
+                        />
+                        <span className="text-[9px] font-bold text-slate-400">₫</span>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 pl-4 border-l border-slate-100 dark:border-slate-800">
+                    <button 
+                        onClick={() => onPrintInvoice(project)}
+                        className={`p-2 rounded-lg transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-indigo-400' : 'text-slate-400 hover:bg-slate-50 hover:text-indigo-600 hover:scale-110'}`}
+                        title="Xuất Hóa đơn"
+                    >
+                        <Printer size={16} />
+                    </button>
+                    
+                    {/* Mark Done Button */}
+                    <button 
+                        onClick={() => {
+                            if (project.status === ProjectStatus.COMPLETED) {
+                                onUpdateProject({ status: ProjectStatus.IN_PROGRESS });
+                            } else {
+                                onUpdateProject({ status: ProjectStatus.COMPLETED });
+                            }
+                        }}
+                        className={`p-2 rounded-lg transition-all duration-300 ${project.status === ProjectStatus.COMPLETED ? 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 rotate-0' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-emerald-500 hover:scale-110' : 'text-slate-400 hover:bg-slate-50 hover:text-emerald-600 hover:scale-110')}`}
+                        title={project.status === ProjectStatus.COMPLETED ? "Mở lại dự án" : "Hoàn thành dự án"}
+                    >
+                        {project.status === ProjectStatus.COMPLETED ? <RotateCcw size={16} /> : <CheckCircle2 size={16} />}
+                    </button>
+
+                    <button 
+                        onClick={() => onDelete()}
+                        className={`p-2 rounded-lg transition-all duration-200 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-red-400' : 'text-slate-400 hover:bg-slate-50 hover:text-red-600 hover:scale-110'}`}
+                        title="Xóa dự án"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                    <button 
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className={`p-2 rounded-lg transition-all duration-300 ${isExpanded ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-50')}`}
+                    >
+                        <ChevronDown size={16} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+            </div>
         </div>
         
-        <h3 className="text-xl font-black mb-1 line-clamp-1" title={project.projectName}>{project.projectName}</h3>
-        <p className="text-sm text-slate-400 font-medium line-clamp-2 h-10">{project.description || 'Không có mô tả'}</p>
-      </div>
-
-      <div className="space-y-4 mb-6">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-400">
-           <span className="flex items-center gap-1"><Calendar size={14}/> {formatDateDisplay(project.deadline)}</span>
-           <div className="flex items-center gap-2">
-               {/* Editable Budget Input */}
-               <div className="flex items-center gap-1 relative group/input cursor-text">
-                   <Banknote size={14} className={isDarkMode ? "text-slate-500" : "text-slate-400"}/>
-                   <input
-                     type="text"
-                     value={localBudget}
-                     onChange={(e) => {
-                        const val = e.target.value.replace(/[^0-9]/g, '');
-                        setLocalBudget(formatNumber(val));
-                     }}
-                     onBlur={() => {
-                        const num = parseNumber(localBudget);
-                        if (num !== project.budget) {
-                           onUpdateProject({ budget: num });
-                        }
-                     }}
-                     className={`w-[85px] bg-transparent border-b border-dashed outline-none font-bold transition-colors ${isDarkMode ? 'border-slate-700 focus:border-indigo-500 text-slate-200' : 'border-slate-300 focus:border-indigo-500 text-slate-700'}`}
-                   />
-                   <span className="text-[9px] uppercase">VNĐ</span>
-               </div>
-               
-               {/* Payment Status Dropdown */}
-               <div className="relative">
-                 <select 
-                    value={project.paymentStatus}
-                    onChange={(e) => onUpdateProject({ paymentStatus: e.target.value as PaymentStatus })}
-                    className={`appearance-none pl-2 pr-6 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border cursor-pointer outline-none transition-colors ${getPaymentColorClass(project.paymentStatus)}`}
-                 >
-                    {Object.values(PaymentStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                 </select>
-                 <ChevronDown size={8} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
-               </div>
-           </div>
+        {/* Progress Bar (Very thin line at bottom of row) */}
+        <div className={`absolute bottom-0 left-0 right-0 h-[3px] bg-transparent overflow-hidden rounded-b-2xl transition-all duration-500 ${isExpanded ? 'opacity-0' : 'opacity-100'}`}>
+             <div className={`h-full ${project.status === ProjectStatus.COMPLETED ? 'bg-emerald-500' : 'bg-indigo-500'} transition-all duration-1000 ease-out`} style={{ width: `${progress}%` }} />
         </div>
-        
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs font-black">
-             <span>Tiến độ</span>
-             <span>{progress}%</span>
-          </div>
-          <div className={`h-2.5 rounded-full overflow-hidden ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-             <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      </div>
 
-      <div className={`pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
-         <button onClick={() => setIsExpanded(!isExpanded)} className="flex items-center justify-between w-full text-sm font-bold hover:text-indigo-500 transition-colors">
-            <span>Danh sách việc ({completedTasks}/{totalTasks})</span>
-            {isExpanded ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-         </button>
-         
-         {isExpanded && (
-            <div className="mt-4 space-y-3 animate-in slide-in-from-top-2">
-               {project.tasks.map(task => (
-                  <TaskItem 
-                    key={task.id}
-                    task={task}
-                    isDarkMode={isDarkMode}
-                    onUpdate={(updates) => onUpdateTask(task.id, updates)}
-                  />
-               ))}
-               
-               <form onSubmit={handleAddTask} className="flex gap-2 mt-2">
+        {/* Expanded Area */}
+        {isExpanded && (
+            <div className={`px-5 pb-5 pt-2 border-t animate-in slide-in-from-top-2 duration-300 ${isDarkMode ? 'border-slate-800' : 'border-slate-50'}`}>
+                <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Danh sách công việc ({completedTasks}/{totalTasks})</span>
+                    <span className="text-[10px] font-bold text-indigo-500">{progress}% Hoàn thành</span>
+                </div>
+                
+                <div className="space-y-1">
+                    {project.tasks.map(task => (
+                        <TaskItem 
+                            key={task.id}
+                            task={task}
+                            isDarkMode={isDarkMode}
+                            onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                        />
+                    ))}
+                </div>
+
+                <form onSubmit={handleAddTask} className="flex gap-2 mt-4">
                   <input 
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
-                    placeholder="Thêm việc..."
-                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold border outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:border-indigo-500' : 'bg-slate-50 border-slate-100 focus:border-indigo-500'}`}
+                    placeholder="Thêm đầu việc mới..."
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border outline-none bg-transparent transition-all duration-200 ${isDarkMode ? 'border-slate-700 focus:border-indigo-500' : 'border-slate-200 focus:border-indigo-500'}`}
                   />
-                  <button type="submit" disabled={!newTaskTitle.trim()} className="p-2 bg-indigo-600 text-white rounded-xl disabled:opacity-50"><Plus size={16}/></button>
+                  <button type="submit" disabled={!newTaskTitle.trim()} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"><Plus size={14}/></button>
                </form>
             </div>
-         )}
-      </div>
+        )}
     </div>
   );
 };
@@ -676,9 +719,10 @@ const App: React.FC = () => {
           return false;
       }
   });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // State for Sidebar
   const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
-  const [financeFilter, setFinanceFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [financeFilter, setFinanceFilter] = useState<'all' | 'completed' | 'active'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSheetConfig, setShowSheetConfig] = useState(false);
   
@@ -813,9 +857,25 @@ const App: React.FC = () => {
   const updateTask = (projectId: string, taskId: string, updates: Partial<Task>) => {
     setProjects(projects.map(p => {
       if (p.id === projectId) {
+        const updatedTasks = p.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t);
+        
+        // Auto update deadline for all projects based on max task date
+        let newDeadline = p.deadline;
+        if (updatedTasks.length > 0) {
+             newDeadline = calculateProjectDeadline(updatedTasks, p.deadline);
+        }
+
+        // AUTO SUM: If project is complex, update total budget based on tasks
+        let newBudget = p.budget;
+        if (p.type === 'complex') {
+            newBudget = updatedTasks.reduce((sum, t) => sum + (t.budget || 0), 0);
+        }
+
         return {
           ...p,
-          tasks: p.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
+          tasks: updatedTasks,
+          deadline: newDeadline,
+          budget: newBudget
         };
       }
       return p;
@@ -832,7 +892,16 @@ const App: React.FC = () => {
       color: TASK_COLORS[Math.floor(Math.random() * TASK_COLORS.length)].value,
       budget: 0 // Initialize with 0 budget
     };
-    setProjects(projects.map(p => p.id === projectId ? { ...p, tasks: [...p.tasks, newTask] } : p));
+    
+    setProjects(projects.map(p => {
+        if (p.id === projectId) {
+            const updatedTasks = [...p.tasks, newTask];
+            const newDeadline = calculateProjectDeadline(updatedTasks, p.deadline);
+            // Budget doesn't change on add because new task budget is 0
+            return { ...p, tasks: updatedTasks, deadline: newDeadline };
+        }
+        return p;
+    }));
   };
 
   const handleSmartInputAdd = (e: React.KeyboardEvent) => {
@@ -993,8 +1062,8 @@ const App: React.FC = () => {
 
   const filteredFinanceProjects = projects.filter(p => {
     if (financeFilter === 'all') return true;
-    if (financeFilter === 'paid') return p.paymentStatus === PaymentStatus.PAID;
-    if (financeFilter === 'pending') return p.paymentStatus !== PaymentStatus.PAID;
+    if (financeFilter === 'completed') return p.status === ProjectStatus.COMPLETED;
+    if (financeFilter === 'active') return p.status !== ProjectStatus.COMPLETED;
     return true;
   });
 
@@ -1003,86 +1072,100 @@ const App: React.FC = () => {
   // CHANGED: Fixed Layout (h-screen + overflow)
   return (
     <div className={`flex flex-col md:flex-row h-screen overflow-hidden transition-all duration-500 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
-      {/* Sidebar - Fixed Height */}
-      <aside className={`w-full md:w-72 border-r p-6 flex flex-col gap-8 transition-colors h-full overflow-y-auto flex-shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl shadow-lg text-white ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
-              <Sparkles size={24} />
+      {/* Sidebar - Dynamic Width */}
+      <aside className={`border-r p-6 flex flex-col gap-6 transition-[width] duration-300 ease-in-out h-full overflow-y-auto flex-shrink-0 ${isSidebarCollapsed ? 'w-[88px]' : 'w-full md:w-64'} ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isSidebarCollapsed && (
+            <div className="flex items-center gap-2 animate-in fade-in duration-300">
+                <div className={`p-2 rounded-lg shadow-lg text-white ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
+                <Sparkles size={18} />
+                </div>
+                <h1 className="text-xl font-black tracking-tight italic">FreeFlow.</h1>
             </div>
-            <h1 className="text-2xl font-black tracking-tight italic">FreeFlow.</h1>
-          </div>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-2 rounded-xl transition-all ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
+          )}
+          {isSidebarCollapsed && (
+              <div className={`p-2 rounded-lg shadow-lg text-white mb-2 ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
+                  <Sparkles size={20} />
+              </div>
+          )}
         </div>
 
-        <nav className="space-y-1">
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Tổng quan" />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án & Task" />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" />
-          <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" />
+        <nav className="space-y-2 flex-1">
+          <NavItem isDarkMode={isDarkMode} active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20}/>} label="Tổng quan" isCollapsed={isSidebarCollapsed} />
+          <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án" isCollapsed={isSidebarCollapsed} />
+          <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" isCollapsed={isSidebarCollapsed} />
+          <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" isCollapsed={isSidebarCollapsed} />
           {/* New AI Tab */}
-          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
-             <NavItem isDarkMode={isDarkMode} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<Bot size={20}/>} label="Trợ lý AI" />
+          <div className={`pt-4 mt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+             <NavItem isDarkMode={isDarkMode} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<Bot size={20}/>} label="Trợ lý AI" isCollapsed={isSidebarCollapsed} />
           </div>
         </nav>
+
+        <div className={`flex flex-col gap-3 pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+             <button onClick={() => setIsDarkMode(!isDarkMode)} className={`p-3 rounded-xl transition-all duration-300 flex items-center justify-center ${isDarkMode ? 'bg-slate-800 text-amber-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`} title="Chế độ màu">
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+             </button>
+             <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className={`p-3 rounded-xl transition-all duration-300 flex items-center justify-center ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`} title={isSidebarCollapsed ? "Mở rộng" : "Thu gọn"}>
+                {isSidebarCollapsed ? <PanelLeftOpen size={20}/> : <PanelLeftClose size={20}/>}
+             </button>
+        </div>
       </aside>
 
       {/* Main Content - Scrollable Independent of Sidebar */}
-      <main className="flex-1 p-6 md:p-10 h-full overflow-y-auto w-full">
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+      <main className="flex-1 p-6 md:p-8 h-full overflow-y-auto w-full">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-8 animate-in slide-in-from-top-4 duration-500">
           <div>
-            <h2 className="text-3xl font-black tracking-tight">
+            <h2 className="text-2xl font-black tracking-tight">
                 {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
                  activeTab === 'projects' ? 'Dự án của bạn' : 
                  activeTab === 'clients' ? 'Quản lý Công ty' :
-                 activeTab === 'ai' ? 'Trợ lý Ảo (Giả lập)' :
+                 activeTab === 'ai' ? 'Trợ lý Tài chính' :
                  'Quản lý tài chính'}
             </h2>
-            <p className="text-slate-500 font-medium">Bạn có {stats.activeCount} dự án đang tiến hành.</p>
+            <p className="text-slate-500 font-medium text-sm mt-1">Bạn có {stats.activeCount} dự án đang tiến hành.</p>
           </div>
-          <button onClick={() => setIsAddingProject(true)} className="group flex items-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold transition-all shadow-xl shadow-indigo-500/20 active:scale-95">
-            <Plus size={20} className="group-hover:rotate-90 transition-transform" />
+          <button onClick={() => setIsAddingProject(true)} className="group flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all duration-300 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 active:scale-95 text-sm">
+            <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
             Dự án mới
           </button>
         </header>
 
         {activeTab === 'dashboard' && (
-          <div className="space-y-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <DashboardCard isDarkMode={isDarkMode} label="Thực thu" value={formatVND(stats.totalEarned)} icon={<CheckCircle2 className="text-emerald-500"/>} trend="Tiền đã về ví" />
-              <DashboardCard isDarkMode={isDarkMode} label="Chưa thu" value={formatVND(stats.pendingInvoices)} icon={<Clock className="text-amber-500"/>} trend="Hóa đơn chờ" />
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <DashboardCard isDarkMode={isDarkMode} label="Thực thu" value={formatVND(stats.totalEarned)} icon={<CheckCircle2 className="text-emerald-500"/>} trend="Tiền về ví" />
+              <DashboardCard isDarkMode={isDarkMode} label="Chưa thu" value={formatVND(stats.pendingInvoices)} icon={<Clock className="text-amber-500"/>} trend="Chờ thanh toán" />
               <DashboardCard isDarkMode={isDarkMode} label="Hoàn thành" value={`${Math.round(stats.overallProgress)}%`} icon={<Target className="text-indigo-500"/>} trend="Tổng tiến độ" />
-              <DashboardCard isDarkMode={isDarkMode} label="Dự án active" value={stats.activeCount.toString()} icon={<Briefcase className="text-slate-500"/>} trend="Đang làm" />
+              <DashboardCard isDarkMode={isDarkMode} label="Active" value={stats.activeCount.toString()} icon={<Briefcase className="text-slate-500"/>} trend="Đang làm" />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className={`lg:col-span-2 p-8 rounded-[2.5rem] border shadow-sm transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <h3 className="text-xl font-bold mb-8">Ngân sách (Triệu VNĐ)</h3>
-                <div className="h-72">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className={`lg:col-span-2 p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <h3 className="text-lg font-bold mb-6">Ngân sách (Triệu VNĐ)</h3>
+                <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#1E293B' : '#F1F5F9'} />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 12}} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 12}} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#94A3B8', fontSize: 11}} />
                       <Tooltip 
                         cursor={{fill: isDarkMode ? '#1E293B' : '#F8FAFC'}} 
-                        contentStyle={{borderRadius: '16px', border: 'none', backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#0F172A'}}
+                        contentStyle={{borderRadius: '12px', border: 'none', backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#0F172A', fontSize: '12px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                         formatter={(val: any) => [`${val}M VNĐ`, 'Budget']}
                       />
-                      <Bar dataKey="budget" radius={[8, 8, 0, 0]} barSize={45}>
+                      <Bar dataKey="budget" radius={[4, 4, 0, 0]} barSize={40} animationDuration={1000}>
                         {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.progress === 100 ? '#10B981' : '#6366F1'} />))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className={`p-8 rounded-[2.5rem] border shadow-sm flex flex-col transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Flame size={20} className="text-orange-500" />Việc GẤP</h3>
-                <div className="space-y-4 flex-1 overflow-y-auto">
+              <div className={`p-6 rounded-2xl border shadow-sm flex flex-col transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Flame size={18} className="text-orange-500" />Việc GẤP</h3>
+                <div className="space-y-3 flex-1 overflow-y-auto">
                   {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()).slice(0, 5).map(p => (
-                    <div key={p.id} className={`flex items-center justify-between p-4 rounded-2xl border ${isDarkMode ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/50 border-orange-100'}`}>
-                      <div><h4 className="font-bold text-sm">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {formatDateDisplay(p.deadline)}</p></div>
+                    <div key={p.id} className={`flex items-center justify-between p-3 rounded-xl border transition-all hover:scale-102 hover:shadow-md ${isDarkMode ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50/50 border-orange-100'}`}>
+                      <div><h4 className="font-bold text-xs truncate max-w-[120px]">{p.projectName}</h4><p className="text-[10px] text-orange-500 font-black uppercase">DL: {formatDateDisplay(p.deadline)}</p></div>
+                      <ArrowRight size={14} className="text-orange-400" />
                     </div>
                   ))}
                   {projects.filter(p => p.isUrgent && p.status !== ProjectStatus.COMPLETED).length === 0 && <p className="text-xs text-slate-500 italic text-center py-10">Không có việc gấp nào.</p>}
@@ -1093,16 +1176,18 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'projects' && (
-          <div className="space-y-8">
-            <div className={`grid grid-cols-4 gap-1 p-1.5 rounded-2xl w-full ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className={`flex gap-1 p-1 rounded-xl w-full max-w-md ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
               <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'all'} onClick={() => setProjectFilter('all')} label="Tất cả" />
               <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'urgent'} onClick={() => setProjectFilter('urgent')} label="Gấp" />
-              <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Đang làm" />
-              <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'completed'} onClick={() => setProjectFilter('completed')} label="Đã xong" />
+              <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'active'} onClick={() => setProjectFilter('active')} label="Active" />
+              <FilterButton isDarkMode={isDarkMode} active={projectFilter === 'completed'} onClick={() => setProjectFilter('completed')} label="Xong" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* New Horizontal List Layout */}
+            <div className="flex flex-col gap-4">
               {filteredProjects.map(project => (
-                <ProjectCard 
+                <ProjectRow 
                   key={project.id} 
                   isDarkMode={isDarkMode}
                   project={project} 
@@ -1113,32 +1198,32 @@ const App: React.FC = () => {
                   onPrintInvoice={handlePrintInvoice}
                 />
               ))}
+              {filteredProjects.length === 0 && (
+                  <div className="text-center py-20 text-slate-400 italic text-sm">Chưa có dự án nào.</div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'clients' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            <div className="space-y-8 animate-in fade-in duration-500">
                 {/* Add New Client Section */}
-                <div className={`p-8 rounded-[2.5rem] border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <h3 className="text-xl font-black mb-6 flex items-center gap-2"><Plus size={24} className="text-indigo-500"/>Thêm công ty mới</h3>
+                <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                    <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Plus size={18} className="text-indigo-500"/>Thêm công ty mới</h3>
                     
-                    {/* Updated Layout: Vertical Stacking */}
-                    <div className="flex flex-col gap-6">
-                        {/* Row 1: Name Input (Full width) */}
-                        <div className="w-full space-y-2">
+                    <div className="flex flex-col gap-4">
+                        <div className="w-full space-y-1">
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên công ty</label>
                             <input 
                                 value={tabClientName}
                                 onChange={(e) => setTabClientName(e.target.value)}
                                 placeholder="Nhập tên..."
-                                className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`}
+                                className={`w-full px-4 py-3 rounded-xl outline-none border transition-all duration-300 font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
                             />
                         </div>
 
-                        {/* Row 2: Color and Button */}
-                        <div className="flex flex-col md:flex-row gap-6 md:items-end">
-                            <div className="space-y-2 flex-1">
+                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
+                            <div className="space-y-1 flex-1">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Màu đại diện</label>
                                 <div className="flex gap-2 flex-wrap">
                                     {PASTEL_PALETTE.map((c) => (
@@ -1146,7 +1231,7 @@ const App: React.FC = () => {
                                             key={c.hex} 
                                             type="button"
                                             onClick={() => setTabClientColor(c.hex)}
-                                            className={`w-10 h-10 rounded-full border-4 transition-transform hover:scale-110 ${tabClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                                            className={`w-8 h-8 rounded-full border-2 transition-transform duration-300 hover:scale-125 ${tabClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
                                             style={{backgroundColor: c.hex}}
                                             title={c.name}
                                         />
@@ -1156,7 +1241,7 @@ const App: React.FC = () => {
                             <button 
                                 onClick={handleAddClientFromTab}
                                 disabled={!tabClientName.trim()}
-                                className="h-[60px] px-8 rounded-2xl bg-indigo-600 text-white font-black hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-xl shadow-indigo-500/20"
+                                className="h-[44px] px-6 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all duration-300 shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 text-sm hover:translate-y-[-2px]"
                             >
                                 Thêm ngay
                             </button>
@@ -1165,65 +1250,57 @@ const App: React.FC = () => {
                 </div>
 
                 {/* Clients List */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {clients.map(client => {
-                        // Calculate stats for each client
                         const clientProjects = projects.filter(p => p.clientName === client.name);
                         const totalRevenue = clientProjects.reduce((sum, p) => sum + p.budget, 0);
                         const projectCount = clientProjects.length;
 
                         return (
-                            <div key={client.id} className={`group relative p-6 rounded-[2rem] border shadow-sm transition-all hover:shadow-xl ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
-                                <div className="absolute top-6 right-6">
+                            <div key={client.id} className={`group relative p-5 rounded-2xl border shadow-sm transition-all duration-300 hover:shadow-lg hover:translate-y-[-4px] ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:shadow-slate-800/50' : 'bg-white border-slate-100 hover:shadow-slate-200'}`}>
+                                <div className="absolute top-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <button 
                                         onClick={() => handleDeleteClient(client.id)}
-                                        className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors"
+                                        className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
                                     >
-                                        <Trash2 size={16}/>
+                                        <Trash2 size={14}/>
                                     </button>
                                 </div>
                                 
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-16 h-16 rounded-2xl shadow-inner" style={{backgroundColor: client.color}} />
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl shadow-inner transition-transform duration-300 group-hover:rotate-6" style={{backgroundColor: client.color}} />
                                     <div>
-                                        <h4 className="text-lg font-black">{client.name}</h4>
-                                        <p className="text-xs text-slate-400 font-medium">Khách hàng thân thiết</p>
+                                        <h4 className="text-base font-black">{client.name}</h4>
+                                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Khách hàng</p>
                                     </div>
                                 </div>
                                 
-                                <div className={`grid grid-cols-2 gap-4 p-4 rounded-2xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                                <div className={`grid grid-cols-2 gap-3 p-3 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Dự án</p>
-                                        <p className="text-xl font-black">{projectCount}</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Dự án</p>
+                                        <p className="text-sm font-black">{projectCount}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Doanh thu</p>
-                                        <p className="text-xl font-black text-emerald-500 tracking-tighter">{formatVND(totalRevenue)}</p>
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Doanh thu</p>
+                                        <p className="text-sm font-black text-emerald-500 tracking-tighter truncate">{formatVND(totalRevenue)}</p>
                                     </div>
                                 </div>
                             </div>
                         );
                     })}
-                    
-                    {clients.length === 0 && (
-                        <div className="col-span-full text-center py-10 text-slate-400 italic">
-                            Chưa có công ty nào. Hãy thêm mới!
-                        </div>
-                    )}
                 </div>
             </div>
         )}
 
         {activeTab === 'finance' && (
-          <div className="space-y-6">
-             {/* Sheet Configuration Panel */}
-             <div className={`p-6 rounded-[2rem] border shadow-sm transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+          <div className="space-y-6 animate-in fade-in duration-500">
+             <div className={`p-6 rounded-2xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                  <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-4">
-                         <div className="p-3 bg-green-100 text-green-600 rounded-xl"><FileSpreadsheet size={24}/></div>
+                     <div className="flex items-center gap-3">
+                         <div className="p-2.5 bg-green-100 text-green-600 rounded-lg"><FileSpreadsheet size={18}/></div>
                          <div>
-                             <h4 className="font-black text-lg">Google Sheets Sync</h4>
-                             <p className="text-xs text-slate-400 font-medium">Đồng bộ dữ liệu thanh toán lên Sheet của bạn</p>
+                             <h4 className="font-black text-base">Google Sheets Sync</h4>
+                             <p className="text-xs text-slate-400 font-medium">Đồng bộ dữ liệu thanh toán</p>
                          </div>
                      </div>
                      <div className="flex gap-2">
@@ -1231,55 +1308,50 @@ const App: React.FC = () => {
                             <button 
                                 onClick={handleSyncToSheet} 
                                 disabled={isSyncing}
-                                className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-xs"
                             >
-                                {isSyncing ? <RefreshCw className="animate-spin" size={18}/> : <RefreshCw size={18}/>}
-                                {isSyncing ? 'Đang Sync...' : 'Sync Ngay'}
+                                {isSyncing ? <RefreshCw className="animate-spin" size={14}/> : <RefreshCw size={14}/>}
+                                {isSyncing ? 'Syncing...' : 'Sync'}
                             </button>
                         ) : (
                             <button 
                                 onClick={() => setShowSheetConfig(!showSheetConfig)} 
-                                className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200 transition-colors flex items-center gap-2 text-xs"
                             >
-                                <LinkIcon size={18}/> Liên kết Sheet
+                                <LinkIcon size={14}/> Link Sheet
                             </button>
                         )}
                         {sheetWebhookUrl && (
-                             <button onClick={() => setShowSheetConfig(!showSheetConfig)} className="p-3 text-slate-400 hover:text-slate-600"><Edit2 size={18}/></button>
+                             <button onClick={() => setShowSheetConfig(!showSheetConfig)} className="p-2 text-slate-400 hover:text-slate-600"><Edit2 size={16}/></button>
                         )}
                      </div>
                  </div>
 
                  {showSheetConfig && (
-                     <div className="mt-6 pt-6 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
-                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                             <div className="space-y-4">
-                                <div className="space-y-2">
+                     <div className="mt-4 pt-4 border-t border-dashed border-slate-200 animate-in slide-in-from-top-2">
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                             <div className="space-y-3">
+                                <div className="space-y-1">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">1. Google Script URL</label>
                                     <input 
                                         value={sheetWebhookUrl}
                                         onChange={(e) => setSheetWebhookUrl(e.target.value)}
                                         placeholder="https://script.google.com/macros/s/..."
-                                        className={`w-full px-4 py-3 rounded-xl border-2 outline-none font-medium text-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                        className={`w-full px-3 py-2 rounded-lg border outline-none font-medium text-xs ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
                                     />
                                 </div>
-                                <div className="p-4 bg-yellow-50 rounded-xl text-yellow-800 text-xs leading-relaxed border border-yellow-100">
-                                    <strong>Hướng dẫn setup:</strong><br/>
-                                    1. Vào Google Sheet {'->'} Extensions {'->'} Apps Script.<br/>
-                                    2. Xóa hết code cũ, paste code bên phải vào.<br/>
-                                    3. Bấm Deploy {'->'} New deployment {'->'} Select type: Web App.<br/>
-                                    4. Access as: <strong>Anyone</strong> (Quan trọng).<br/>
-                                    5. Copy Web App URL dán vào ô bên trên.
+                                <div className="p-3 bg-yellow-50 rounded-lg text-yellow-800 text-[10px] leading-relaxed border border-yellow-100">
+                                    <strong>Setup:</strong> Extensions {'>'} Apps Script {'>'} Paste Code {'>'} Deploy Web App (Access: Anyone).
                                 </div>
                              </div>
                              
-                             <div className="space-y-2">
+                             <div className="space-y-1">
                                  <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Code Apps Script (Copy & Paste)</label>
-                                    <button onClick={handleCopyScript} className="text-xs font-bold text-indigo-500 hover:underline flex items-center gap-1"><Copy size={12}/> Copy Code</button>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">2. Apps Script Code</label>
+                                    <button onClick={handleCopyScript} className="text-[10px] font-bold text-indigo-500 hover:underline flex items-center gap-1"><Copy size={10}/> Copy</button>
                                  </div>
-                                 <div className={`relative rounded-xl overflow-hidden border ${isDarkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
-                                     <pre className="p-4 text-[10px] font-mono overflow-x-auto h-48 text-slate-500">
+                                 <div className={`relative rounded-lg overflow-hidden border ${isDarkMode ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50'}`}>
+                                     <pre className="p-3 text-[9px] font-mono overflow-x-auto h-24 text-slate-500">
                                          {GOOGLE_SCRIPT_CODE}
                                      </pre>
                                  </div>
@@ -1289,102 +1361,103 @@ const App: React.FC = () => {
                  )}
              </div>
 
-            <div className={`rounded-[2.5rem] border shadow-sm overflow-hidden transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className={`p-10 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
+            <div className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                <div className={`p-6 border-b flex justify-between items-center ${isDarkMode ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-50/50 border-slate-50'}`}>
                     <div>
-                        <h3 className="text-2xl font-black">Danh sách thu nhập</h3>
-                        <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">Quản lý dòng tiền</p>
+                        <h3 className="text-lg font-black">Thu nhập</h3>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-widest">Dòng tiền</p>
                     </div>
                     {/* Finance Status Filter */}
-                    <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                        <button onClick={() => setFinanceFilter('all')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'all' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white shadow-sm text-indigo-600') : 'text-slate-400'}`}>Tất cả</button>
-                        <button onClick={() => setFinanceFilter('paid')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'paid' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-emerald-500'}`}>Đã nhận</button>
-                        <button onClick={() => setFinanceFilter('pending')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${financeFilter === 'pending' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-amber-500'}`}>Chờ nhận</button>
+                    <div className={`flex p-1 rounded-lg ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                        <button onClick={() => setFinanceFilter('all')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'all' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white shadow-sm text-indigo-600') : 'text-slate-400'}`}>All</button>
+                        <button onClick={() => setFinanceFilter('completed')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'completed' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-emerald-500'}`}>Completed (Thu)</button>
+                        <button onClick={() => setFinanceFilter('active')} className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${financeFilter === 'active' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-amber-500'}`}>Active (Chờ)</button>
                     </div>
                 </div>
                 <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <thead>
-                    <tr className={`text-[11px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
-                        <th className="px-10 py-6">Công ty</th>
-                        <th className="px-10 py-6">Dự án</th>
-                        <th className="px-10 py-6">Budget</th>
-                        <th className="px-10 py-6 text-center">Trạng thái</th>
-                        <th className="px-10 py-6 text-right">Ngày nhận</th>
+                    <tr className={`text-[10px] font-black text-slate-400 uppercase tracking-widest ${isDarkMode ? 'bg-slate-900' : 'bg-white'}`}>
+                        <th className="px-6 py-4">Công ty</th>
+                        <th className="px-6 py-4">Dự án</th>
+                        <th className="px-6 py-4">Budget</th>
+                        <th className="px-6 py-4 text-center">Status</th>
+                        <th className="px-6 py-4 text-right">Ngày</th>
                     </tr>
                     </thead>
                     <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-50'}`}>
                     {filteredFinanceProjects.map(p => (
-                        <tr key={p.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
-                        <td className="px-10 py-6 font-bold text-sm">
+                        <tr key={p.id} className={`transition-colors duration-200 ${isDarkMode ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50/50'}`}>
+                        <td className="px-6 py-4 font-bold text-xs">
                             <span className="px-2 py-1 rounded-md text-slate-700" style={{backgroundColor: p.clientColor || '#e2e8f0'}}>{p.clientName}</span>
                         </td>
-                        <td className="px-10 py-6 font-bold">{p.projectName}</td>
-                        <td className="px-10 py-6 font-mono font-bold">{formatVND(p.budget)}</td>
-                        <td className="px-10 py-6 text-center">
+                        <td className="px-6 py-4 font-bold text-sm">{p.projectName}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-sm">{formatVND(p.budget)}</td>
+                        <td className="px-6 py-4 text-center">
                             <button 
                             onClick={() => updateProject(p.id, { paymentStatus: p.paymentStatus === PaymentStatus.PAID ? PaymentStatus.PENDING : PaymentStatus.PAID })} 
-                            className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
+                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 ${p.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}
                             >
                             {p.paymentStatus}
                             </button>
                         </td>
-                        <td className="px-10 py-6 text-sm text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="px-6 py-4 text-xs text-slate-400 font-medium text-right">{new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
                         </tr>
                     ))}
                     </tbody>
                 </table>
                 {filteredFinanceProjects.length === 0 && (
-                    <div className="py-12 text-center text-slate-400 text-sm font-medium italic">Không có dữ liệu phù hợp.</div>
+                    <div className="py-12 text-center text-slate-400 text-xs font-medium italic">Không có dữ liệu phù hợp.</div>
                 )}
                 </div>
             </div>
           </div>
         )}
 
-        {/* New AI Tab Content */}
+        {/* New AI Tab Content - Updated Dropdown UI */}
         {activeTab === 'ai' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                <div className={`p-8 rounded-[2.5rem] border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <div className="max-w-3xl mx-auto text-center space-y-4 mb-10">
-                        <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
-                            <Bot size={32}/>
+            <div className="space-y-8 animate-in fade-in duration-500">
+                <div className={`p-8 rounded-3xl border shadow-sm transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                    <div className="max-w-3xl mx-auto text-center space-y-4 mb-8">
+                        <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-indigo-500/30 animate-bounce">
+                            <Bot size={28}/>
                         </div>
-                        <h3 className="text-3xl font-black">Trợ lý AI Freelance (Giả lập)</h3>
-                        <p className="text-slate-500 font-medium">
-                            Tính năng này sẽ tổng hợp dữ liệu dự án của bạn thành một prompt (câu lệnh). <br/>
-                            Bạn chỉ cần copy và dán vào Gemini/ChatGPT để nhận tư vấn.
+                        <h3 className="text-2xl font-black">Trợ lý Tài chính AI</h3>
+                        <p className="text-slate-500 font-medium text-sm">
+                            Phân tích dữ liệu tài chính và đưa ra lời khuyên quản lý dòng tiền.
                         </p>
                     </div>
 
-                    <div className="max-w-2xl mx-auto space-y-6">
-                        {/* Suggestions Chips */}
-                        <div>
-                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Gợi ý nhanh</p>
-                             <div className="flex flex-wrap gap-2 justify-center">
-                                 {AI_SUGGESTIONS.map((suggestion, i) => (
-                                     <button 
-                                        key={i}
-                                        onClick={() => setAiPrompt(suggestion)}
-                                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${isDarkMode ? 'border-slate-700 hover:bg-slate-800 hover:border-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-500 text-slate-600'}`}
-                                     >
-                                        {suggestion}
-                                     </button>
-                                 ))}
+                    <div className="max-w-xl mx-auto space-y-6">
+                        {/* Prompt Selector - Dropdown */}
+                        <div className="space-y-2">
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block text-center">Chọn chủ đề phân tích</label>
+                             <div className="relative">
+                                 <select 
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    className={`w-full appearance-none px-4 py-3 rounded-xl text-sm font-bold border-2 outline-none cursor-pointer transition-colors duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:border-indigo-500' : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-500'}`}
+                                    defaultValue=""
+                                 >
+                                     <option value="" disabled>-- Chọn gợi ý --</option>
+                                     {AI_SUGGESTIONS.map((s, i) => (
+                                         <option key={i} value={s}>{s}</option>
+                                     ))}
+                                 </select>
+                                 <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"/>
                              </div>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bạn muốn hỏi gì?</label>
-                            <div className={`relative rounded-2xl border-2 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus-within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung câu hỏi</label>
+                            <div className={`relative rounded-2xl border-2 transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border-slate-700 focus-within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
                                 <textarea 
                                     value={aiPrompt}
                                     onChange={(e) => setAiPrompt(e.target.value)}
-                                    placeholder="VD: Hãy phân tích tiến độ các dự án và gợi ý cách tối ưu doanh thu tháng này..."
-                                    className="w-full p-4 bg-transparent outline-none min-h-[120px] font-medium resize-none"
+                                    placeholder="Hoặc tự nhập câu hỏi của bạn tại đây..."
+                                    className="w-full p-4 bg-transparent outline-none min-h-[100px] font-medium resize-none text-sm"
                                 />
                                 <div className="absolute bottom-3 right-3">
-                                    <MessageSquare size={16} className="text-slate-400"/>
+                                    <MessageSquare size={14} className="text-slate-400"/>
                                 </div>
                             </div>
                         </div>
@@ -1392,15 +1465,15 @@ const App: React.FC = () => {
                         <button 
                             onClick={handleGenerateAiPrompt}
                             disabled={!aiPrompt.trim()}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-200 hover:translate-y-[-2px] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                         >
-                            <Copy size={20}/>
+                            <Copy size={16}/>
                             <span>Copy Prompt & Mở Gemini</span>
-                            <ExternalLink size={16} className="opacity-70"/>
+                            <ExternalLink size={14} className="opacity-70"/>
                         </button>
 
-                        <div className={`p-4 rounded-xl text-xs text-center border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
-                            Hệ thống sẽ tự động đính kèm thông tin: {projects.length} dự án, tổng thu {formatNumber(stats.totalEarned)}đ.
+                        <div className={`p-3 rounded-xl text-[10px] text-center border border-dashed transition-colors ${isDarkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            Hệ thống sẽ tự động đính kèm dữ liệu: {projects.length} dự án, tổng thu {formatNumber(stats.totalEarned)}đ.
                         </div>
                     </div>
                 </div>
@@ -1411,66 +1484,66 @@ const App: React.FC = () => {
       {/* Creation Modal */}
       {isAddingProject && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className={`rounded-[3rem] w-full max-w-2xl p-12 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-slate-900 text-slate-100 border border-slate-800' : 'bg-white text-slate-900'}`}>
-            <h2 className="text-3xl font-black mb-6 tracking-tight">Thêm dự án mới</h2>
+          <div className={`rounded-3xl w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto ${isDarkMode ? 'bg-slate-900 text-slate-100 border border-slate-800' : 'bg-white text-slate-900'}`}>
+            <h2 className="text-2xl font-black mb-6 tracking-tight">Thêm dự án mới</h2>
             
             {/* Segmentation Button */}
-            <div className={`flex p-1.5 rounded-2xl w-full mb-8 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <div className={`flex p-1 rounded-xl w-full mb-6 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <button 
                     type="button" 
                     onClick={() => setProjectType('single')} 
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === 'single' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'single' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
                 >
-                    <FileType size={16}/> Dự án lẻ
+                    <FileType size={14}/> Dự án lẻ
                 </button>
                 <button 
                     type="button" 
                     onClick={() => setProjectType('complex')} 
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${projectType === 'complex' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${projectType === 'complex' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-white text-slate-900 shadow-sm') : 'text-slate-400'}`}
                 >
-                    <Layers size={16}/> Dự án lớn
+                    <Layers size={14}/> Dự án lớn
                 </button>
             </div>
 
-            <form onSubmit={handleCreateProject} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên dự án</label><input required name="projectName" type="text" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="VD: Landing Page..." /></div>
+            <form onSubmit={handleCreateProject} className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên dự án</label><input required name="projectName" type="text" className={`w-full px-4 py-3 rounded-xl outline-none border transition-all font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="VD: Landing Page..." /></div>
                 
                 {/* Custom Client Selector with Color */}
-                <div className="space-y-2 relative" ref={clientDropdownRef}>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Khách hàng / Công ty</label>
+                <div className="space-y-1.5 relative" ref={clientDropdownRef}>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Khách hàng</label>
                     
                     <div 
                         onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
-                        className={`w-full px-6 py-4 rounded-2xl border-2 transition-all font-bold flex items-center justify-between cursor-pointer ${isDarkMode ? 'bg-slate-800 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-50 hover:border-indigo-500'}`}
+                        className={`w-full px-4 py-3 rounded-xl border transition-all font-bold text-sm flex items-center justify-between cursor-pointer ${isDarkMode ? 'bg-slate-800 border-slate-800 hover:border-indigo-500' : 'bg-slate-50 border-slate-50 hover:border-indigo-500'}`}
                     >
                         {selectedClientDisplay ? (
-                            <div className="flex items-center gap-3">
-                                <div className="w-4 h-4 rounded-full" style={{backgroundColor: selectedClientDisplay.color}} />
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{backgroundColor: selectedClientDisplay.color}} />
                                 <span>{selectedClientDisplay.name}</span>
                             </div>
                         ) : (
                             <span className="text-slate-400 font-normal">Chọn khách hàng...</span>
                         )}
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
                     </div>
 
                     {/* Dropdown Menu - Simplified (No Delete) */}
                     {isClientDropdownOpen && (
-                        <div className={`absolute top-[110%] left-0 right-0 rounded-2xl shadow-xl border z-20 overflow-hidden animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                        <div className={`absolute top-[110%] left-0 right-0 rounded-xl shadow-xl border z-20 overflow-hidden animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                             {!isAddingNewClient ? (
                                 <>
                                     <div className="max-h-48 overflow-y-auto">
                                         {clients.map(client => (
                                             <div 
                                                 key={client.id}
-                                                className={`flex items-center justify-between px-6 py-3 transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
+                                                className={`flex items-center justify-between px-4 py-2.5 transition-colors cursor-pointer ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
                                                 onClick={() => { setSelectedClientId(client.id); setIsClientDropdownOpen(false); }}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: client.color}} />
-                                                    <span className="font-bold text-sm">{client.name}</span>
-                                                    {selectedClientId === client.id && <Check size={14} className="text-indigo-500 ml-2"/>}
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: client.color}} />
+                                                    <span className="font-bold text-xs">{client.name}</span>
+                                                    {selectedClientId === client.id && <Check size={12} className="text-indigo-500 ml-2"/>}
                                                 </div>
                                             </div>
                                         ))}
@@ -1479,35 +1552,35 @@ const App: React.FC = () => {
                                         <button 
                                             type="button" 
                                             onClick={() => setIsAddingNewClient(true)}
-                                            className="w-full py-2.5 rounded-xl text-xs font-black text-indigo-500 uppercase tracking-widest hover:bg-indigo-500/10 transition-colors flex items-center justify-center gap-2"
+                                            className="w-full py-2 rounded-lg text-[10px] font-black text-indigo-500 uppercase tracking-widest hover:bg-indigo-500/10 transition-colors flex items-center justify-center gap-1"
                                         >
-                                            <Plus size={14}/> Thêm công ty mới
+                                            <Plus size={12}/> Thêm công ty mới
                                         </button>
                                     </div>
                                 </>
                             ) : (
                                 // Add New Client Mode within Dropdown (Quick Add)
-                                <div className="p-4 space-y-4">
+                                <div className="p-3 space-y-3">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black uppercase text-slate-400">Công ty mới</span>
-                                        <button type="button" onClick={() => setIsAddingNewClient(false)} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
+                                        <button type="button" onClick={() => setIsAddingNewClient(false)} className="text-slate-400 hover:text-red-500"><X size={12}/></button>
                                     </div>
                                     <input 
                                         autoFocus
                                         value={newClientName}
                                         onChange={(e) => setNewClientName(e.target.value)}
                                         placeholder="Tên công ty..."
-                                        className={`w-full px-3 py-2 rounded-xl text-sm font-bold border-2 outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
+                                        className={`w-full px-3 py-2 rounded-lg text-xs font-bold border outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}
                                     />
                                     <div>
-                                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-2">Chọn màu Pastel</span>
-                                        <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-2">Chọn màu</span>
+                                        <div className="flex flex-wrap gap-1.5">
                                             {PASTEL_PALETTE.map((c) => (
                                                 <button 
                                                     key={c.hex} 
                                                     type="button"
                                                     onClick={() => setNewClientColor(c.hex)}
-                                                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${newClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                                                    className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${newClientColor === c.hex ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
                                                     style={{backgroundColor: c.hex}}
                                                     title={c.name}
                                                 />
@@ -1518,9 +1591,9 @@ const App: React.FC = () => {
                                         type="button" 
                                         onClick={handleAddNewClient}
                                         disabled={!newClientName.trim()}
-                                        className="w-full py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+                                        className="w-full py-1.5 rounded-lg bg-indigo-600 text-white text-[10px] font-bold hover:bg-indigo-700 disabled:opacity-50"
                                     >
-                                        Lưu & Chọn
+                                        Lưu
                                     </button>
                                 </div>
                             )}
@@ -1529,35 +1602,35 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả dự án</label><textarea name="description" className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-medium h-24 ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="Chi tiết..." /></div>
+              <div className="space-y-1.5"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mô tả</label><textarea name="description" className={`w-full px-4 py-3 rounded-xl outline-none border transition-all font-medium h-20 text-sm ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} placeholder="Chi tiết..." /></div>
 
               {projectType === 'complex' ? (
                 // Complex Mode UI
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                    <div className={`p-6 rounded-3xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-indigo-50/50 border-indigo-200'}`}>
-                        <div className="flex items-center justify-between mb-4">
-                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5"><Layers size={14}/> Các hạng mục (Tasks)</label>
-                            <span className="text-[10px] font-bold text-slate-400">Gõ: "Tên - 1204" để thêm nhanh</span>
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                    <div className={`p-4 rounded-2xl border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-indigo-50/50 border-indigo-200'}`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5"><Layers size={12}/> Task nhanh</label>
+                            <span className="text-[9px] font-bold text-slate-400">VD: "Banner - 1504"</span>
                         </div>
                         
-                        <div className="flex gap-2 mb-4">
+                        <div className="flex gap-2 mb-3">
                             <input 
                                 value={smartInput}
                                 onChange={(e) => setSmartInput(e.target.value)}
                                 onKeyDown={handleSmartInputAdd}
-                                placeholder="VD: Banner Facebook - 1504 (Enter để thêm)"
-                                className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold border-2 outline-none ${isDarkMode ? 'bg-slate-900 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-200 focus:border-indigo-500'}`}
+                                placeholder="Tên task - Deadline (Enter)"
+                                className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold border outline-none ${isDarkMode ? 'bg-slate-900 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-200 focus:border-indigo-500'}`}
                             />
-                            <button type="button" onClick={() => handleSmartInputAdd({ key: 'Enter', preventDefault: () => {} } as any)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold"><Plus size={20}/></button>
+                            <button type="button" onClick={() => handleSmartInputAdd({ key: 'Enter', preventDefault: () => {} } as any)} className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-bold"><Plus size={16}/></button>
                         </div>
 
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                        <div className="space-y-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                             {tempTasks.map((t, idx) => (
-                                <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'}`}>
+                                <div key={idx} className={`flex items-center justify-between p-2 rounded-lg border ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-100'}`}>
                                     <div className="flex-1">
-                                        <p className="font-bold text-sm">{t.title}</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400"><Calendar size={10}/> {formatDateDisplay(t.dueDate)}</span>
+                                        <p className="font-bold text-xs truncate">{t.title}</p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded flex items-center gap-1 dark:bg-slate-800 dark:text-slate-400"><Calendar size={8}/> {formatDateDisplay(t.dueDate)}</span>
                                             {/* Formatted Task Budget */}
                                             <input 
                                                 type="text" 
@@ -1569,50 +1642,49 @@ const App: React.FC = () => {
                                                     newTasks[idx].budget = rawVal;
                                                     setTempTasks(newTasks);
                                                 }}
-                                                className={`w-24 text-[10px] font-bold bg-transparent border-b border-dashed outline-none ${isDarkMode ? 'border-slate-600 placeholder:text-slate-600' : 'border-slate-300 placeholder:text-slate-400'}`}
+                                                className={`w-20 text-[9px] font-bold bg-transparent border-b border-dashed outline-none ${isDarkMode ? 'border-slate-600 placeholder:text-slate-600' : 'border-slate-300 placeholder:text-slate-400'}`}
                                             />
                                         </div>
                                     </div>
-                                    <button type="button" onClick={() => setTempTasks(tempTasks.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-red-500"><X size={16}/></button>
+                                    <button type="button" onClick={() => setTempTasks(tempTasks.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-red-500"><X size={14}/></button>
                                 </div>
                             ))}
-                            {tempTasks.length === 0 && <p className="text-center text-xs text-slate-400 py-4 italic">Chưa có task nào.</p>}
+                            {tempTasks.length === 0 && <p className="text-center text-[10px] text-slate-400 py-2 italic">Chưa có task nào.</p>}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-2 gap-4">
                          <div className="opacity-70 pointer-events-none">
-                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline (Auto)</label>
-                             <div className={`mt-2 font-black text-lg ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{formDeadline ? formatDateDisplay(formDeadline) : '--/--'}</div>
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline</label>
+                             <div className={`mt-1 font-black text-base ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{formDeadline ? formatDateDisplay(formDeadline) : '--/--'}</div>
                          </div>
                          <div>
-                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng Budget (VNĐ)</label>
+                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng Budget</label>
                              <input 
                                 value={formatNumber(complexBudget)} 
                                 readOnly
                                 type="text" 
-                                className={`w-full mt-1 px-4 py-3 rounded-2xl outline-none border-2 transition-all font-black text-lg ${isDarkMode ? 'bg-slate-800 border-slate-800' : 'bg-slate-50 border-slate-50'}`} 
+                                className={`w-full mt-1 px-3 py-2 rounded-xl outline-none border transition-all font-black text-base ${isDarkMode ? 'bg-slate-800 border-slate-800' : 'bg-slate-50 border-slate-50'}`} 
                              />
-                             <p className="text-[10px] text-slate-500 mt-1">*Tự động cộng từ task con</p>
                          </div>
                     </div>
                 </div>
               ) : (
                 // Single Mode UI
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline (Gõ tắt: 134 = 13/4)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deadline</label>
                         <input 
                             name="deadline" 
                             type="text" 
-                            placeholder="VD: 134, 1304, 13/4"
+                            placeholder="VD: 134, 1304"
                             value={formDeadline} 
                             onChange={(e) => setFormDeadline(e.target.value)} 
                             onBlur={(e) => setFormDeadline(parseSmartDate(e.target.value))}
-                            className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-indigo-50/50 border-indigo-100 focus:border-indigo-500 text-indigo-700'}`} 
+                            className={`w-full px-4 py-3 rounded-xl outline-none border transition-all font-bold text-sm ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-indigo-50/50 border-indigo-100 focus:border-indigo-500 text-indigo-700'}`} 
                         />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Budget (VNĐ)</label>
                         <input 
                             name="budget" 
@@ -1620,18 +1692,18 @@ const App: React.FC = () => {
                             required
                             value={formBudgetDisplay}
                             onChange={(e) => setFormBudgetDisplay(formatNumber(parseNumber(e.target.value)))}
-                            className={`w-full px-6 py-4 rounded-2xl outline-none border-2 transition-all font-black ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} 
+                            className={`w-full px-4 py-3 rounded-xl outline-none border transition-all font-black text-sm ${isDarkMode ? 'bg-slate-800 border-slate-800 focus:border-indigo-500' : 'bg-slate-50 border-slate-50 focus:border-indigo-500'}`} 
                             placeholder="0" 
                         />
                     </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-3 py-2"><input type="checkbox" name="isUrgent" id="isUrgent" className="w-6 h-6 rounded-lg text-orange-500 focus:ring-orange-500" /><label htmlFor="isUrgent" className="text-sm font-black text-orange-500 uppercase tracking-widest flex items-center gap-1.5"><Flame size={16} />Dự án này đang GẤP</label></div>
+              <div className="flex items-center gap-2 py-1"><input type="checkbox" name="isUrgent" id="isUrgent" className="w-5 h-5 rounded text-orange-500 focus:ring-orange-500" /><label htmlFor="isUrgent" className="text-xs font-black text-orange-500 uppercase tracking-widest flex items-center gap-1"><Flame size={14} />Dự án này đang GẤP</label></div>
 
-              <div className="flex gap-4 pt-8">
-                <button type="button" onClick={() => setIsAddingProject(false)} className={`flex-1 py-5 font-bold rounded-2xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Hủy</button>
-                <button type="submit" className="flex-[2] py-5 font-black text-white bg-indigo-600 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-3"><CheckCircle2 size={24} />Tạo dự án</button>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsAddingProject(false)} className={`flex-1 py-3.5 font-bold rounded-xl transition-colors text-sm ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>Hủy</button>
+                <button type="submit" className="flex-[2] py-3.5 font-black text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 text-sm"><CheckCircle2 size={18} />Tạo dự án</button>
               </div>
             </form>
           </div>
