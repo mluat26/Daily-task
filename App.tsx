@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   LayoutDashboard, 
@@ -64,10 +63,13 @@ import {
   Image,
   Lock,
   CalendarCheck,
-  GraduationCap, // Icon cho Study Mode
-  BookOpen,      // Icon Môn học
-  NotebookPen,   // Icon Bài tập
-  Library        // Icon Tài liệu
+  ListTodo,
+  AlertCircle,
+  Pencil,
+  GraduationCap,
+  BookOpen,
+  NotebookPen,
+  Library
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -413,6 +415,93 @@ const MiniFocusTimer: React.FC<{
         </div>
     );
 };
+
+// --- UPDATED COMPONENT: Daily Task Card for Sidebar ---
+const DailyTaskCard: React.FC<{
+    isDarkMode: boolean;
+    isCollapsed: boolean;
+    onClick: () => void;
+    isActive: boolean;
+    taskCount: number;
+}> = ({ isDarkMode, isCollapsed, onClick, isActive, taskCount }) => {
+    return (
+        <div 
+            onClick={onClick}
+            className={`relative overflow-hidden cursor-pointer transition-all duration-300 group hover:scale-[1.02] ${isCollapsed ? 'w-12 h-12 rounded-xl mx-auto' : 'w-full h-[88px] rounded-2xl mx-auto shadow-lg'}`}
+        >
+            {/* Background Gradient & Effects - Blue Sea Gradient */}
+            <div className={`absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 ${isActive ? 'opacity-100' : 'opacity-90 hover:opacity-100'}`}></div>
+            
+            {/* Large Icon in Background */}
+            {!isCollapsed && <ListTodo size={80} className="absolute -right-4 -bottom-6 text-white opacity-10 rotate-12 transition-transform group-hover:scale-110" />}
+
+            {/* Content */}
+            {isCollapsed ? (
+                <div className="absolute inset-0 flex items-center justify-center text-white">
+                    <ListTodo size={24} />
+                </div>
+            ) : (
+                <div className="relative p-4 h-full flex flex-col justify-center text-white">
+                    <div className="text-xs font-bold uppercase tracking-wider opacity-80 mb-1">Công việc hôm nay</div>
+                    <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl font-black tracking-tight leading-none">{taskCount}</span>
+                        <span className="text-sm font-bold opacity-90">Tasks</span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- UPDATED COMPONENT: Mini Task Item for Daily View ---
+const MiniTaskCard: React.FC<{
+    task: Task;
+    projectTitle: string;
+    clientName: string;
+    projectColor?: string;
+    isDarkMode: boolean;
+    onToggle: () => void;
+    isOverdue?: boolean;
+}> = ({ task, projectTitle, clientName, projectColor, isDarkMode, onToggle, isOverdue }) => (
+    <div className={`p-4 rounded-xl border transition-all duration-300 hover:shadow-md ${task.completed ? 'opacity-50' : ''} ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-100'}`}>
+        <div className="flex items-start gap-3">
+            <button 
+                onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-600 hover:border-emerald-500' : 'border-slate-200 hover:border-emerald-500')}`}
+            >
+                {task.completed && <Check size={12} strokeWidth={4} />}
+            </button>
+            <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    {/* Client Name Tag */}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                        {clientName}
+                    </span>
+                    {/* Project Tag */}
+                    <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded text-white truncate max-w-[120px]" style={{backgroundColor: projectColor || '#94a3b8'}}>
+                        {projectTitle}
+                    </span>
+                    {isOverdue && !task.completed && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-red-500">
+                            <AlertCircle size={10} /> Quá hạn
+                        </span>
+                    )}
+                </div>
+                <h4 className={`font-bold text-sm mb-2 ${task.completed ? 'line-through text-slate-500' : ''}`}>{task.title}</h4>
+                <div className="flex items-center gap-4 text-xs text-slate-400">
+                    <div className={`flex items-center gap-1 font-bold ${isOverdue && !task.completed ? 'text-red-400' : ''}`}>
+                        <Calendar size={12}/> {formatDateDisplay(task.dueDate)}
+                    </div>
+                    {task.budget && task.budget > 0 && (
+                        <div className="flex items-center gap-1 font-mono">
+                            <Banknote size={12}/> {formatNumber(task.budget)}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    </div>
+);
 
 // Interface for FocusMode Props
 interface FocusModeProps {
@@ -1005,8 +1094,11 @@ const App: React.FC = () => {
       }
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // State for Sidebar
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai' | 'focus'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai' | 'focus' | 'daily'>('dashboard');
   const [appMode, setAppMode] = useState<'work' | 'study'>('work'); // New: Switch between Work/Study Mode
+
+  // Daily View State
+  const [showTaskHistory, setShowTaskHistory] = useState(false);
 
   // Sort & Filter State
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
@@ -1146,6 +1238,55 @@ const App: React.FC = () => {
       
       return { isMonthEnd: isEnd, daysToMonthEnd: diffDays };
   }, []);
+
+  // Daily View Data Logic
+  const getDailyTasks = useMemo(() => {
+      const allTasks = projects.flatMap(p => p.tasks.map(t => ({
+          ...t,
+          projectId: p.id,
+          projectTitle: p.projectName,
+          projectColor: p.clientColor,
+          clientName: p.clientName // Added Client Name
+      })));
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Sắp xếp: Quá hạn -> Hôm nay -> Tương lai
+      const sorted = allTasks.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+      // Calculate simple Today's task count for the Sidebar Card
+      const todayTaskCount = sorted.filter(t => {
+          if (t.completed) return false;
+          const due = new Date(t.dueDate);
+          due.setHours(0,0,0,0);
+          return due.getTime() === today.getTime();
+      }).length;
+
+      return {
+          pending: sorted.filter(t => !t.completed),
+          completed: sorted.filter(t => t.completed),
+          urgent: sorted.filter(t => {
+              if (t.completed) return false;
+              const due = new Date(t.dueDate);
+              due.setHours(0,0,0,0);
+              const diffTime = due.getTime() - today.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+              // Urgent if overdue or due within 3 days
+              return diffDays <= 3;
+          }),
+          upcoming: sorted.filter(t => {
+              if (t.completed) return false;
+              const due = new Date(t.dueDate);
+              due.setHours(0,0,0,0);
+              const diffTime = due.getTime() - today.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              // Upcoming if due in more than 3 days
+              return diffDays > 3;
+          }),
+          todayTaskCount // Export this count
+      };
+  }, [projects]);
 
   const handleGenerateMonthSummary = () => {
       if (!isMonthEnd) return;
@@ -1562,6 +1703,17 @@ The vibe should be professional yet celebrating a month of hard work. Focus on t
           )}
         </div>
 
+        {/* DAILY TASK CARD */}
+        <div className="mb-2">
+            <DailyTaskCard 
+                isDarkMode={isDarkMode} 
+                isCollapsed={isSidebarCollapsed} 
+                onClick={() => setActiveTab('daily')} 
+                isActive={activeTab === 'daily'} 
+                taskCount={getDailyTasks.todayTaskCount}
+            />
+        </div>
+
         <nav className="space-y-2 flex-1">
           {appMode === 'work' ? (
               <>
@@ -1643,11 +1795,14 @@ The vibe should be professional yet celebrating a month of hard work. Focus on t
                                 activeTab === 'projects' ? 'Dự án của bạn' : 
                                 activeTab === 'clients' ? 'Quản lý Công ty' :
                                 activeTab === 'finance' ? 'Quản lý doanh thu' :
+                                activeTab === 'daily' ? 'Công việc hàng ngày' :
                                 'Trợ lý Tài chính'}
                             </h2>
                             <p className={`font-bold mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {activeTab === 'dashboard' ? (
                                     <span className="flex items-center gap-2"><CalendarDays size={16}/> {currentDateDisplay}</span>
+                                ) : activeTab === 'daily' ? (
+                                    "Tập trung hoàn thành các mục tiêu trong ngày."
                                 ) : (
                                     `Bạn có ${stats.activeCount} dự án đang tiến hành.`
                                 )}
@@ -2059,6 +2214,106 @@ The vibe should be professional yet celebrating a month of hard work. Focus on t
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {/* --- NEW DAILY VIEW --- */}
+                {activeTab === 'daily' && (
+                    <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
+                        <div className="flex justify-end">
+                            <button 
+                                onClick={() => setShowTaskHistory(!showTaskHistory)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${showTaskHistory ? 'bg-indigo-600 text-white' : (isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-indigo-600 shadow-sm border border-slate-200')}`}
+                            >
+                                <History size={14} /> Lịch sử Task
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 overflow-hidden">
+                            {/* Column 1: Cần làm (Urgent + Pending Today) */}
+                            <div className={`rounded-3xl p-6 flex flex-col h-full border overflow-hidden ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white/50 border-white shadow-sm'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-black flex items-center gap-2"><Zap size={20} className="text-amber-500" fill="currentColor"/> Cần làm ngay</h3>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                                        {getDailyTasks.urgent.length} tasks
+                                    </span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                                    {getDailyTasks.urgent.map(task => (
+                                        <MiniTaskCard 
+                                            key={task.id}
+                                            task={task}
+                                            projectTitle={task.projectTitle}
+                                            clientName={task.clientName}
+                                            projectColor={task.projectColor}
+                                            isDarkMode={isDarkMode}
+                                            onToggle={() => updateTask(task.projectId, task.id, { completed: !task.completed })}
+                                            isOverdue={true}
+                                        />
+                                    ))}
+                                    {getDailyTasks.urgent.length === 0 && (
+                                        <div className="text-center py-10 text-slate-400 italic text-xs">Tuyệt vời! Không có việc gấp.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Column 2: Sắp đến hẹn (Upcoming) */}
+                            <div className={`rounded-3xl p-6 flex flex-col h-full border overflow-hidden ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white/50 border-white shadow-sm'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-black flex items-center gap-2"><Calendar size={20} className="text-indigo-500"/> Sắp đến hẹn</h3>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                                        {getDailyTasks.upcoming.length} tasks
+                                    </span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                                    {getDailyTasks.upcoming.map(task => (
+                                        <MiniTaskCard 
+                                            key={task.id}
+                                            task={task}
+                                            projectTitle={task.projectTitle}
+                                            clientName={task.clientName}
+                                            projectColor={task.projectColor}
+                                            isDarkMode={isDarkMode}
+                                            onToggle={() => updateTask(task.projectId, task.id, { completed: !task.completed })}
+                                        />
+                                    ))}
+                                    {getDailyTasks.upcoming.length === 0 && (
+                                        <div className="text-center py-10 text-slate-400 italic text-xs">Trống lịch sắp tới.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* History Modal */}
+                        {showTaskHistory && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                                <div className={`w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-slate-900 border border-slate-800' : 'bg-white border border-slate-200'}`}>
+                                    <div className="p-6 border-b flex items-center justify-between">
+                                        <h3 className="text-xl font-black">Lịch sử hoàn thành</h3>
+                                        <button onClick={() => setShowTaskHistory(false)} className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'}`}>
+                                            <X size={20}/>
+                                        </button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto space-y-3">
+                                        {getDailyTasks.completed.map(task => (
+                                            <div key={task.id} className={`p-4 rounded-xl border opacity-75 hover:opacity-100 transition-opacity ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>{task.clientName}</span>
+                                                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">{task.projectTitle}</span>
+                                                    </div>
+                                                    <CheckCheck size={14} className="text-emerald-500"/>
+                                                </div>
+                                                <h4 className="font-bold text-sm line-through text-slate-500">{task.title}</h4>
+                                            </div>
+                                        ))}
+                                        {getDailyTasks.completed.length === 0 && (
+                                            <p className="text-center text-slate-400 text-xs py-10">Chưa có task nào hoàn thành.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </>
