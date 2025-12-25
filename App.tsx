@@ -32,7 +32,10 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Link as LinkIcon,
-  Copy
+  Copy,
+  Bot,
+  ExternalLink,
+  MessageSquare
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -461,10 +464,13 @@ const App: React.FC = () => {
           return false;
       }
   });
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'projects' | 'finance' | 'clients' | 'ai'>('dashboard');
   const [projectFilter, setProjectFilter] = useState<'all' | 'urgent' | 'active' | 'completed'>('all');
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSheetConfig, setShowSheetConfig] = useState(false);
+  
+  // AI Tab State
+  const [aiPrompt, setAiPrompt] = useState('');
   
   // Creation Modal State
   const [isAddingProject, setIsAddingProject] = useState(false);
@@ -569,7 +575,17 @@ const App: React.FC = () => {
 
   // Handlers
   const updateProject = (projectId: string, updates: Partial<Project>) => {
-    setProjects(projects.map(p => p.id === projectId ? { ...p, ...updates } : p));
+    setProjects(projects.map(p => {
+        if (p.id === projectId) {
+            const updatedProject = { ...p, ...updates };
+            // Auto-complete logic: If status is set to COMPLETED, mark all tasks as completed
+            if (updates.status === ProjectStatus.COMPLETED) {
+                updatedProject.tasks = p.tasks.map(t => ({ ...t, completed: true }));
+            }
+            return updatedProject;
+        }
+        return p;
+    }));
   };
 
   const updateTask = (projectId: string, taskId: string, updates: Partial<Task>) => {
@@ -695,6 +711,15 @@ const App: React.FC = () => {
       alert('Đã copy đoạn mã Script! Hãy paste vào Extensions > Apps Script trong Sheet của bạn.');
   };
 
+  const handleGenerateAiPrompt = () => {
+      const context = projects.map(p => `- Dự án: ${p.projectName} (${p.status}). Budget: ${formatNumber(p.budget)} VNĐ. Deadline: ${formatDateDisplay(p.deadline)}.`).join('\n');
+      const fullPrompt = `Dữ liệu freelance hiện tại của tôi:\n${context}\n\nTổng doanh thu đã nhận: ${formatNumber(stats.totalEarned)} VNĐ.\n\nYêu cầu của tôi: ${aiPrompt}`;
+      
+      navigator.clipboard.writeText(fullPrompt);
+      window.open('https://gemini.google.com/app', '_blank');
+      alert('Đã copy dữ liệu vào Clipboard và mở Gemini! Hãy dán (Ctrl+V) vào ô chat.');
+  };
+
   const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -745,10 +770,11 @@ const App: React.FC = () => {
 
   const selectedClientDisplay = clients.find(c => c.id === selectedClientId);
 
+  // CHANGED: Fixed Layout (h-screen + overflow)
   return (
-    <div className={`flex flex-col md:flex-row min-h-screen transition-all duration-500 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
-      {/* Sidebar */}
-      <aside className={`w-full md:w-72 border-r p-6 flex flex-col gap-8 transition-colors ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+    <div className={`flex flex-col md:flex-row h-screen overflow-hidden transition-all duration-500 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#F8FAFC] text-slate-900'}`}>
+      {/* Sidebar - Fixed Height */}
+      <aside className={`w-full md:w-72 border-r p-6 flex flex-col gap-8 transition-colors h-full overflow-y-auto flex-shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-2.5 rounded-xl shadow-lg text-white ${isDarkMode ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-slate-900 shadow-slate-200'}`}>
@@ -766,17 +792,22 @@ const App: React.FC = () => {
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'projects'} onClick={() => setActiveTab('projects')} icon={<Target size={20}/>} label="Dự án & Task" />
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'clients'} onClick={() => setActiveTab('clients')} icon={<Building2 size={20}/>} label="Công ty" />
           <NavItem isDarkMode={isDarkMode} active={activeTab === 'finance'} onClick={() => setActiveTab('finance')} icon={<DollarSign size={20}/>} label="Doanh thu" />
+          {/* New AI Tab */}
+          <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+             <NavItem isDarkMode={isDarkMode} active={activeTab === 'ai'} onClick={() => setActiveTab('ai')} icon={<Bot size={20}/>} label="Trợ lý AI" />
+          </div>
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto max-w-6xl mx-auto w-full">
+      {/* Main Content - Scrollable Independent of Sidebar */}
+      <main className="flex-1 p-6 md:p-10 h-full overflow-y-auto w-full">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
           <div>
             <h2 className="text-3xl font-black tracking-tight">
                 {activeTab === 'dashboard' ? 'Chào ngày mới!' : 
                  activeTab === 'projects' ? 'Dự án của bạn' : 
                  activeTab === 'clients' ? 'Quản lý Công ty' :
+                 activeTab === 'ai' ? 'Trợ lý Ảo (Giả lập)' :
                  'Quản lý tài chính'}
             </h2>
             <p className="text-slate-500 font-medium">Bạn có {stats.activeCount} dự án đang tiến hành.</p>
@@ -1070,6 +1101,55 @@ const App: React.FC = () => {
                 </div>
             </div>
           </div>
+        )}
+
+        {/* New AI Tab Content */}
+        {activeTab === 'ai' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+                <div className={`p-8 rounded-[2.5rem] border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                    <div className="max-w-3xl mx-auto text-center space-y-4 mb-10">
+                        <div className="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-indigo-500/30">
+                            <Bot size={32}/>
+                        </div>
+                        <h3 className="text-3xl font-black">Trợ lý AI Freelance (Giả lập)</h3>
+                        <p className="text-slate-500 font-medium">
+                            Tính năng này sẽ tổng hợp dữ liệu dự án của bạn thành một prompt (câu lệnh). <br/>
+                            Bạn chỉ cần copy và dán vào Gemini/ChatGPT để nhận tư vấn.
+                        </p>
+                    </div>
+
+                    <div className="max-w-2xl mx-auto space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bạn muốn hỏi gì?</label>
+                            <div className={`relative rounded-2xl border-2 transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus-within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
+                                <textarea 
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    placeholder="VD: Hãy phân tích tiến độ các dự án và gợi ý cách tối ưu doanh thu tháng này..."
+                                    className="w-full p-4 bg-transparent outline-none min-h-[120px] font-medium resize-none"
+                                />
+                                <div className="absolute bottom-3 right-3">
+                                    <MessageSquare size={16} className="text-slate-400"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={handleGenerateAiPrompt}
+                            disabled={!aiPrompt.trim()}
+                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            <Copy size={20}/>
+                            <span>Copy Prompt & Mở Gemini</span>
+                            <ExternalLink size={16} className="opacity-70"/>
+                        </button>
+
+                        <div className={`p-4 rounded-xl text-xs text-center border border-dashed ${isDarkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                            Hệ thống sẽ tự động đính kèm thông tin: {projects.length} dự án, tổng thu {formatNumber(stats.totalEarned)}đ.
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
       </main>
 
