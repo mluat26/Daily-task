@@ -23,7 +23,7 @@ export const getWorkloadAdvice = async (projects: Project[]) => {
       contents: prompt,
       config: { temperature: 0.7 },
     });
-    return response.text;
+    return response.text || "";
   } catch (error) {
     console.error("Gemini Error:", error);
     return "Không thể lấy lời khuyên lúc này. Hãy tập trung vào các dự án đang gấp!";

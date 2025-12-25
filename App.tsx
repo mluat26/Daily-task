@@ -286,7 +286,7 @@ const App: React.FC = () => {
                       <Tooltip 
                         cursor={{fill: isDarkMode ? '#1E293B' : '#F8FAFC'}} 
                         contentStyle={{borderRadius: '16px', border: 'none', backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', color: isDarkMode ? '#F8FAFC' : '#0F172A'}}
-                        formatter={(val: number) => [`${val}M VNĐ`, 'Budget']}
+                        formatter={(val: any) => [`${val}M VNĐ`, 'Budget']}
                       />
                       <Bar dataKey="budget" radius={[8, 8, 0, 0]} barSize={45}>
                         {chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.progress === 100 ? '#10B981' : '#6366F1'} />))}
